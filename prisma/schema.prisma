@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ── Enums ─────────────────────────────────────────────────────────────────────
+
+enum EventType {
+  VIEW
+  CALL
+  MAP
+  RESERVATION
+}
+
+// ── Models ────────────────────────────────────────────────────────────────────
+
+model Shop {
+  id          Int      @id @default(autoincrement())
+  company     String
+  subject     String   @db.Text
+  content     String   @db.Text
+  area        String
+  category    String   @default("")
+  category2   String   @default("")
+  phone       String   @default("")
+  hphone      String   @default("")
+  telegram    String   @default("")
+  hit         Int      @default(0)
+  price       Int      @default(0)
+  mainPhoto   String   @default("")
+  photos      String[]
+  time1       String   @default("")
+  time2       String   @default("")
+  timeFull    Boolean  @default(false)
+  isVisible   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  lastLoginAt DateTime?
+
+  analyticsEvents AnalyticsEvent[]
+
+  @@index([lastLoginAt])                   // Retention: 미접속 업주 필터
+}
+
+model AnalyticsEvent {
+  id        Int       @id @default(autoincrement())
+  storeId   Int
+  eventType EventType
+  ipAddress String
+  createdAt DateTime  @default(now())
+
+  shop Shop @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId, eventType, createdAt]) // Sales Funnel: 업소+유형+기간
+  @@index([createdAt, storeId])            // Popular Shops: 기간 필터 → storeId 집계
+  @@index([ipAddress, createdAt])          // Suspicious IP: IP별 단시간 이벤트 감지
+}
+
+model SearchLog {
+  id          Int      @id @default(autoincrement())
+  keyword     String
+  resultCount Int
+  createdAt   DateTime @default(now())
+
+  @@index([resultCount])                   // Demand-Supply: 결과 0건 키워드 필터
+}
