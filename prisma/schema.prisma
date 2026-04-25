@@ -143,6 +143,7 @@ model User {
   shopsOwned       Shop[]         @relation("ShopOwner")
   inquiriesSent    AdminInquiry[] @relation("InquirySender")
   claimsRequested  ClaimRequest[] @relation("ClaimRequester")
+  boardPosts       BoardPost[]    @relation("BoardPostAuthor")
 
   @@index([status])
   @@index([role])
@@ -248,4 +249,35 @@ model ClaimRequest {
   @@index([status, createdAt])     // admin 검토 큐
   @@index([shopId])                // 같은 업소 중복 신청 체크
   @@index([claimantId, createdAt]) // 사용자가 신청한 클레임 내역
+}
+
+// ── SiteConfig — 사이트 전역 토글 (singleton, id=1 고정) ────────────────────
+
+model SiteConfig {
+  id                     Int      @id @default(1)        // 항상 1
+  isShopCommunityActive  Boolean  @default(false)        // 업소 전용 비밀 게시판 ON/OFF
+  updatedAt              DateTime @updatedAt
+}
+
+// ── BoardPost — 일반 게시판 (category 로 다중 게시판 분기, polymorphic) ────
+//   category 예시: 'shop_only', 'free', 'notice', ...
+//   업소 전용은 'shop_only' 로 저장하고 페이지에서 필터.
+
+model BoardPost {
+  id        Int      @id @default(autoincrement())
+  category  String   @db.VarChar(32)
+  title     String
+  content   String   @db.Text
+  authorId  Int
+  isVisible Boolean  @default(true)
+  viewCount Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  author User @relation("BoardPostAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([category, createdAt])     // 게시판별 최신순 (핵심)
+  @@index([authorId, createdAt])     // 작성자별
+  @@index([category, isVisible, deletedAt])
 }

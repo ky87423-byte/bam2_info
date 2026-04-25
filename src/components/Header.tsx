@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { Search, Calendar, User, LogOut, LogIn, UserPlus, Coins, Store, Tag, Ticket, Shield } from "lucide-react";
+import { Search, Calendar, User, LogOut, LogIn, UserPlus, Coins, Store, Tag, Ticket, Shield, Lock } from "lucide-react";
 import { auth } from "@/auth";
 import { logoutAction } from "@/lib/actions/auth";
 import { getUserById, getSettings } from "@/lib/data";
+import { getSiteConfig } from "@/lib/siteConfig";
 import UnreadMessageBadge from "./messages/UnreadMessageBadge";
 
 export default async function Header() {
@@ -10,6 +11,12 @@ export default async function Header() {
   const userId   = session?.user?.id ? parseInt(session.user.id) : null;
   const user     = userId ? await getUserById(userId) : null;
   const settings = getSettings();
+  const config   = await getSiteConfig();
+
+  // 업소 전용 비밀 게시판 — 마스터 스위치 ON + role(shop|admin) 둘 다 충족 시에만 노출
+  const showShopCommunity =
+    config.isShopCommunityActive &&
+    !!user && (user.role === "shop" || user.role === "admin");
 
   return (
     <header className="bg-[#1a1a2e] text-white sticky top-0 z-50 shadow-lg">
@@ -72,6 +79,15 @@ export default async function Header() {
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-white/70 hover:text-white hover:bg-white/10 transition-colors">
                   <Store size={14} />
                   업소 관리
+                </Link>
+              )}
+              {/* 업소 전용 비밀 게시판 — siteConfig.isShopCommunityActive && role(shop|admin) */}
+              {showShopCommunity && (
+                <Link href="/shop-community"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-amber-400/15 text-amber-200 hover:bg-amber-400/25 hover:text-amber-100 transition-colors"
+                  title="업소회원 전용 비밀 게시판">
+                  <Lock size={13} />
+                  업소 게시판
                 </Link>
               )}
               <UnreadMessageBadge />
