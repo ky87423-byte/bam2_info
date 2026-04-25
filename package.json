@@ -13,6 +13,7 @@
     "db:seed": "tsx scripts/seed-analytics.ts",
     "db:benchmark": "tsx scripts/benchmark-analytics.ts",
     "db:verify": "tsx scripts/verify-analytics.ts",
+    "db:migrate-json": "tsx scripts/migrate-users-points.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:events": "vitest run src/lib/api/events.test.ts --reporter=verbose"

@@ -3,11 +3,12 @@ import { Search, Calendar, User, LogOut, LogIn, UserPlus, Coins, Store, Tag, Tic
 import { auth } from "@/auth";
 import { logoutAction } from "@/lib/actions/auth";
 import { getUserById, getSettings } from "@/lib/data";
+import UnreadMessageBadge from "./messages/UnreadMessageBadge";
 
 export default async function Header() {
   const session  = await auth();
   const userId   = session?.user?.id ? parseInt(session.user.id) : null;
-  const user     = userId ? getUserById(userId) : null;
+  const user     = userId ? await getUserById(userId) : null;
   const settings = getSettings();
 
   return (
@@ -73,6 +74,7 @@ export default async function Header() {
                   업소 관리
                 </Link>
               )}
+              <UnreadMessageBadge />
               <Link href="/mypage"
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-white/70 hover:text-white hover:bg-white/10 transition-colors">
                 <Coins size={13} className="text-yellow-400" />

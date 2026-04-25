@@ -19,10 +19,10 @@ export default async function MyPage() {
   if (!session?.user?.id) redirect("/login");
 
   const userId = parseInt(session.user.id);
-  const user = getUserById(userId);
+  const user = await getUserById(userId);
   if (!user) redirect("/login");
 
-  const { logs, total: totalLogs } = getPointLogs({ userId, page: 1, pageSize: 20 });
+  const { logs, total: totalLogs } = await getPointLogs({ userId, page: 1, pageSize: 20 });
   const todayAttend  = getTodayAttendance(userId);
   const myCoupons    = getUserCoupons(userId);
 

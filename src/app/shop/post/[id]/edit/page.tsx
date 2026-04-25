@@ -10,7 +10,7 @@ export default async function EditShopPostPage({ params }: { params: Promise<{ i
   if (!session?.user?.id) redirect("/login");
 
   const userId = parseInt(session.user.id);
-  const user = getUserById(userId);
+  const user = await getUserById(userId);
   if (!user) redirect("/login");
 
   const postId = parseInt(id);

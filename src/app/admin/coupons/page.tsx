@@ -1,10 +1,10 @@
 import { getCoupons, getUsers, getSettings } from "@/lib/data";
 import CouponManager from "./CouponManager";
 
-export default function AdminCouponsPage() {
+export default async function AdminCouponsPage() {
   const coupons   = getCoupons();
   const settings  = getSettings();
-  const { users } = getUsers("", 1, 9999);
+  const { users } = await getUsers("", 1, 9999);
   const shopUsers = users.filter((u) => u.role === "shop" && u.status === "active");
   return (
     <CouponManager

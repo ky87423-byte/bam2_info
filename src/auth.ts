@@ -15,7 +15,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       authorize: async (credentials) => {
         if (!credentials?.username || !credentials?.password) return null;
 
-        const user = getUserByUsername(credentials.username as string);
+        const user = await getUserByUsername(credentials.username as string);
         if (!user || user.status === "blocked") return null;
         if (!user.passwordHash) return null;
 
@@ -26,8 +26,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const today = new Date().toISOString().slice(0, 10);
         if (user.lastLoginDate !== today) {
           const settings = getSettings();
-          awardPoints(user.id, "login", settings.pointLogin, "일일 로그인");
-          updateUser(user.id, { lastLoginDate: today });
+          await awardPoints(user.id, "login", settings.pointLogin, "일일 로그인");
+          await updateUser(user.id, { lastLoginDate: today });
         }
 
         return {

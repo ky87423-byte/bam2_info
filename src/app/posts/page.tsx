@@ -3,16 +3,17 @@ import { getShopPosts } from "@/lib/data";
 import { MapPin, Tag, Phone, Clock, ImageIcon } from "lucide-react";
 
 interface Props {
-  searchParams: Promise<{ area?: string; category?: string; q?: string; page?: string }>;
+  searchParams: Promise<{ area?: string; category?: string; q?: string; author?: string; page?: string }>;
 }
 
 const PAGE_SIZE = 20;
 
 export default async function PostsPage({ searchParams }: Props) {
   const params   = await searchParams;
-  const area     = params.area ?? "";
+  const area     = params.area     ?? "";
   const category = params.category ?? "";
-  const q        = params.q ?? "";
+  const q        = params.q        ?? "";
+  const author   = params.author   ?? "";
   const page     = Math.max(1, parseInt(params.page ?? "1", 10));
 
   const { posts: allPosts } = getShopPosts({ status: "approved" });
@@ -20,6 +21,7 @@ export default async function PostsPage({ searchParams }: Props) {
   let filtered = allPosts;
   if (area)     filtered = filtered.filter((p) => p.area === area);
   if (category) filtered = filtered.filter((p) => p.category === category);
+  if (author)   filtered = filtered.filter((p) => p.authorUsername === author);
   if (q) {
     const lq = q.toLowerCase();
     filtered = filtered.filter((p) =>
@@ -37,7 +39,7 @@ export default async function PostsPage({ searchParams }: Props) {
   const categories = [...new Set(allPosts.map((p) => p.category).filter((c): c is string => !!c))].sort();
 
   const buildUrl = (overrides: Record<string, string>) => {
-    const p: Record<string, string> = { area, category, q, ...overrides };
+    const p: Record<string, string> = { area, category, q, author, ...overrides };
     const qs = Object.entries(p).filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
     return `/posts${qs ? `?${qs}` : ""}`;
   };

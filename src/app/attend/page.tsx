@@ -14,7 +14,7 @@ export default async function AttendPage() {
 
   const userId = session?.user?.id ? parseInt(session.user.id) : null;
   const myRecord = userId ? getTodayAttendance(userId) : null;
-  const stats = getAttendanceStats().slice(0, 20);
+  const stats = (await getAttendanceStats()).slice(0, 20);
 
   const bonus1 = settings.pointAttendStreakBonus;
 

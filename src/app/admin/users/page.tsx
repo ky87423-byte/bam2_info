@@ -12,11 +12,11 @@ export default async function AdminUsersPage({ searchParams }: Props) {
   const params = await searchParams;
   const q = params.q ?? "";
   const page = Math.max(1, parseInt(params.page ?? "1", 10));
-  const { users, total } = getUsers(q, page);
+  const { users, total } = await getUsers(q, page);
   const totalPages = Math.ceil(total / PAGE_SIZE);
   const pendingShops = users.filter((u) => u.role === "shop" && u.status === "blocked").length;
   // 전체에서 승인 대기 수 확인
-  const { users: allUsers } = getUsers("", 1, 9999);
+  const { users: allUsers } = await getUsers("", 1, 9999);
   const totalPendingShops = allUsers.filter((u) => u.role === "shop" && u.status === "blocked").length;
 
   return (

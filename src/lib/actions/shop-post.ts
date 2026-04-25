@@ -17,7 +17,7 @@ export async function actionCreateShopPost(_prev: unknown, formData: FormData) {
   if (!session?.user?.id) return { error: "로그인이 필요합니다." };
 
   const authorId = parseInt(session.user.id);
-  const user = getUserById(authorId);
+  const user = await getUserById(authorId);
   if (!user) return { error: "회원 정보를 찾을 수 없습니다." };
   if (user.role !== "shop" && user.role !== "admin") return { error: "업소회원만 게시글을 작성할 수 있습니다." };
 
@@ -64,7 +64,7 @@ export async function actionUpdateShopPost(_prev: unknown, formData: FormData) {
   if (!post) return { error: "게시글을 찾을 수 없습니다." };
 
   const authorId = parseInt(session.user.id);
-  const user = getUserById(authorId);
+  const user = await getUserById(authorId);
   if (!user) return { error: "회원 정보를 찾을 수 없습니다." };
   if (post.authorId !== authorId && user.role !== "admin") return { error: "수정 권한이 없습니다." };
 
@@ -108,7 +108,7 @@ export async function actionDeleteShopPost(postId: number) {
   if (!post) return;
 
   const authorId = parseInt(session.user.id);
-  const user = getUserById(authorId);
+  const user = await getUserById(authorId);
   if (!user) return;
   if (post.authorId !== authorId && user.role !== "admin") return;
 
@@ -120,7 +120,7 @@ export async function actionDeleteShopPost(postId: number) {
 export async function actionApproveShopPost(postId: number) {
   const session = await auth();
   if (!session?.user?.id) return;
-  const user = getUserById(parseInt(session.user.id));
+  const user = await getUserById(parseInt(session.user.id));
   if (user?.role !== "admin") return;
 
   approveShopPost(postId);
@@ -130,7 +130,7 @@ export async function actionApproveShopPost(postId: number) {
 export async function actionRejectShopPost(postId: number, reason: string) {
   const session = await auth();
   if (!session?.user?.id) return;
-  const user = getUserById(parseInt(session.user.id));
+  const user = await getUserById(parseInt(session.user.id));
   if (user?.role !== "admin") return;
 
   rejectShopPost(postId, reason);

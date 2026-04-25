@@ -18,7 +18,7 @@ export async function actionUpdateUser(formData: FormData) {
     if (newStatus === "blocked") statusDates.blockedAt = today;
   }
 
-  updateUser(id, {
+  await updateUser(id, {
     username: formData.get("username") as string,
     nickname: formData.get("nickname") as string,
     level: parseInt(formData.get("level") as string, 10) || 1,
@@ -35,12 +35,12 @@ export async function actionUpdateUser(formData: FormData) {
 }
 
 export async function actionDeleteUser(id: number) {
-  deleteUser(id);
+  await deleteUser(id);
   revalidatePath("/admin/users");
 }
 
 export async function actionToggleUserStatus(id: number, status: "active" | "blocked") {
-  updateUser(id, { status });
+  await updateUser(id, { status });
   revalidatePath("/admin/users");
   revalidatePath(`/admin/users/${id}`);
 }

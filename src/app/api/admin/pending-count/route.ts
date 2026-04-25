@@ -7,7 +7,7 @@ export async function GET() {
   if (session?.user?.role !== "admin") {
     return NextResponse.json({ count: 0 }, { status: 401 });
   }
-  const { users } = getUsers("", 1, 9999);
+  const { users } = await getUsers("", 1, 9999);
   const count = users.filter((u) => u.role === "shop" && u.status === "blocked").length;
   return NextResponse.json({ count });
 }

@@ -1,13 +1,14 @@
 import fs from "fs";
 import path from "path";
+import { prisma } from "./prisma";
+import { UserRole, UserStatus, PointAction as DbPointAction } from "@/generated/prisma/enums";
 
 const SHOPS_PATH       = path.join(process.cwd(), "..", "bam_info", "scraped_data", "shops.json");
 const OVERRIDE_PATH    = path.join(process.cwd(), "data", "shop_overrides.json");
-const USERS_PATH       = path.join(process.cwd(), "data", "users.json");
+// USERS_PATH, POINT_LOGS_PATH 제거 — User/PointLog는 Prisma DB로 이관됨
 const SETTINGS_PATH    = path.join(process.cwd(), "data", "settings.json");
 const COUPONS_PATH     = path.join(process.cwd(), "data", "coupons.json");
 const NOTICES_PATH     = path.join(process.cwd(), "data", "notices.json");
-const POINT_LOGS_PATH  = path.join(process.cwd(), "data", "point_logs.json");
 const ATTENDANCE_PATH  = path.join(process.cwd(), "data", "attendance.json");
 const SHOP_POSTS_PATH  = path.join(process.cwd(), "data", "shop_posts.json");
 const USER_COUPONS_PATH = path.join(process.cwd(), "data", "user_coupons.json");
@@ -293,160 +294,207 @@ export function toggleShopVisibility(id: number) {
   updateShop(id, { isVisible: !shop.isVisible });
 }
 
-// ── 회원 CRUD ────────────────────────────────────────────────────────────────
-function loadUsers(): UserData[] {
-  ensureDir();
-  try {
-    if (!fs.existsSync(USERS_PATH)) {
-      const seed = seedUsers();
-      fs.writeFileSync(USERS_PATH, JSON.stringify(seed, null, 2));
-      return seed;
-    }
-    const raw = JSON.parse(fs.readFileSync(USERS_PATH, "utf-8")) as UserData[];
-    return raw.map((u) => ({
-      ...u,
-      nickname: u.nickname ?? u.username,
-      passwordHash: u.passwordHash ?? "",
-      role: u.role ?? "user",
-      shopPostLimit: u.shopPostLimit ?? 3,
-      attendStreak: u.attendStreak ?? 0,
-      totalAttend: u.totalAttend ?? 0,
-    }));
-  } catch { return []; }
+// ── 회원 CRUD (Prisma) ───────────────────────────────────────────────────────
+// JSON → Postgres 이관 완료. 모든 함수는 async.
+
+const ROLE_TO_DB: Record<NonNullable<UserData["role"]>, UserRole> = {
+  user:  UserRole.USER,
+  shop:  UserRole.SHOP,
+  admin: UserRole.ADMIN,
+};
+const STATUS_TO_DB: Record<UserData["status"], UserStatus> = {
+  active:  UserStatus.ACTIVE,
+  blocked: UserStatus.BLOCKED,
+};
+const ROLE_FROM_DB: Record<UserRole, "user" | "shop" | "admin"> = {
+  USER: "user", SHOP: "shop", ADMIN: "admin",
+};
+const STATUS_FROM_DB: Record<UserStatus, "active" | "blocked"> = {
+  ACTIVE: "active", BLOCKED: "blocked",
+};
+const ACTION_TO_DB: Record<PointAction, DbPointAction> = {
+  signup:  DbPointAction.SIGNUP,
+  login:   DbPointAction.LOGIN,
+  attend:  DbPointAction.ATTEND,
+  post:    DbPointAction.POST,
+  comment: DbPointAction.COMMENT,
+  admin:   DbPointAction.ADMIN,
+  etc:     DbPointAction.ETC,
+};
+const ACTION_FROM_DB: Record<DbPointAction, PointAction> = {
+  SIGNUP: "signup", LOGIN: "login", ATTEND: "attend", POST: "post",
+  COMMENT: "comment", LUCKY: "etc",  // LUCKY는 UI상 etc로 매핑 (PointAction 타입 호환)
+  ADMIN:  "admin",  ETC:   "etc",
+};
+
+type DbUser = Awaited<ReturnType<typeof prisma.user.findUnique>>;
+type DbPointLog = Awaited<ReturnType<typeof prisma.pointLog.findUnique>>;
+
+function dbToUser(u: NonNullable<DbUser>): UserData {
+  return {
+    id: u.id,
+    username: u.username,
+    nickname: u.nickname,
+    passwordHash: u.passwordHash,
+    role: ROLE_FROM_DB[u.role as UserRole],
+    status: STATUS_FROM_DB[u.status as UserStatus],
+    level: u.level,
+    points: u.points,
+    memo: u.memo,
+    shopPostLimit: u.shopPostLimit ?? undefined,
+    joinedAt: u.joinedAt.toISOString().slice(0, 10),
+    approvedAt: u.approvedAt ? u.approvedAt.toISOString().slice(0, 10) : undefined,
+    blockedAt:  u.blockedAt  ? u.blockedAt.toISOString().slice(0, 10)  : undefined,
+    lastLoginDate:  u.lastLoginDate  ?? undefined,
+    lastAttendDate: u.lastAttendDate ?? undefined,
+    attendStreak: u.attendStreak,
+    totalAttend:  u.totalAttend,
+  };
 }
 
-function seedUsers(): UserData[] {
-  return Array.from({ length: 5 }, (_, i) => ({
-    id: i + 1,
-    username: `user${i + 1}`,
-    nickname: `닉네임${i + 1}`,
-    passwordHash: "",
-    level: Math.floor(Math.random() * 3) + 1,
-    points: Math.floor(Math.random() * 2000),
-    status: "active" as const,
-    joinedAt: new Date(Date.now() - Math.random() * 1e10).toISOString().slice(0, 10),
-    memo: "",
-    attendStreak: 0,
-    totalAttend: 0,
-  }));
+function dbToPointLog(l: NonNullable<DbPointLog>): PointLog {
+  return {
+    id: l.id,
+    userId: l.userId,
+    username: l.username,
+    action: ACTION_FROM_DB[l.action as DbPointAction],
+    amount: l.amount,
+    balance: l.balance,
+    memo: l.memo,
+    createdAt: l.createdAt.toISOString(),
+  };
 }
 
-function saveUsers(users: UserData[]) {
-  ensureDir();
-  fs.writeFileSync(USERS_PATH, JSON.stringify(users, null, 2));
+export async function getUsers(q = "", page = 1, pageSize = 20) {
+  const where = q
+    ? { OR: [
+        { username: { contains: q, mode: "insensitive" as const } },
+        { nickname: { contains: q, mode: "insensitive" as const } },
+      ]}
+    : {};
+  const [rows, total] = await Promise.all([
+    prisma.user.findMany({
+      where,
+      orderBy: { id: "asc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.user.count({ where }),
+  ]);
+  return { users: rows.map(dbToUser), total };
 }
 
-export function getUsers(q = "", page = 1, pageSize = 20) {
-  let users = loadUsers();
-  if (q) {
-    const lq = q.toLowerCase();
-    users = users.filter((u) => u.username.includes(lq) || u.nickname.includes(lq));
-  }
-  return { users: users.slice((page - 1) * pageSize, page * pageSize), total: users.length };
+export async function getUserById(id: number): Promise<UserData | null> {
+  const u = await prisma.user.findUnique({ where: { id } });
+  return u ? dbToUser(u) : null;
 }
 
-export function getUserById(id: number): UserData | null {
-  return loadUsers().find((u) => u.id === id) ?? null;
+export async function getUserByUsername(username: string): Promise<UserData | null> {
+  const u = await prisma.user.findUnique({ where: { username } });
+  return u ? dbToUser(u) : null;
 }
 
-export function getUserByUsername(username: string): UserData | null {
-  return loadUsers().find((u) => u.username === username) ?? null;
-}
-
-export function createUser(data: {
+export async function createUser(data: {
   username: string;
   nickname?: string;
   passwordHash: string;
   role?: "admin" | "shop" | "user";
   status?: "active" | "blocked";
   memo?: string;
-}): { ok: true; user: UserData } | { ok: false; error: string } {
-  const users = loadUsers();
-  if (users.some((u) => u.username === data.username)) {
-    return { ok: false, error: "이미 사용 중인 아이디입니다." };
-  }
-  const id = users.length ? Math.max(...users.map((u) => u.id)) + 1 : 1;
-  const newUser: UserData = {
-    id,
-    username: data.username,
-    nickname: data.nickname || data.username,
-    passwordHash: data.passwordHash,
-    role: data.role ?? "user",
-    status: data.status ?? "active",
-    level: 1,
-    points: 0,
-    joinedAt: new Date().toISOString().slice(0, 10),
-    memo: data.memo ?? "",
-    shopPostLimit: data.role === "shop" ? 3 : undefined,
-    attendStreak: 0,
-    totalAttend: 0,
-  };
-  users.push(newUser);
-  saveUsers(users);
-  return { ok: true, user: newUser };
+}): Promise<{ ok: true; user: UserData } | { ok: false; error: string }> {
+  const exists = await prisma.user.findUnique({ where: { username: data.username }, select: { id: true } });
+  if (exists) return { ok: false, error: "이미 사용 중인 아이디입니다." };
+
+  const role = ROLE_TO_DB[data.role ?? "user"];
+  const status = STATUS_TO_DB[data.status ?? "active"];
+  const created = await prisma.user.create({
+    data: {
+      username: data.username,
+      nickname: data.nickname || data.username,
+      passwordHash: data.passwordHash,
+      role,
+      status,
+      level: 1,
+      points: 0,
+      memo: data.memo ?? "",
+      shopPostLimit: data.role === "shop" ? 3 : null,
+      joinedAt: new Date(),
+      attendStreak: 0,
+      totalAttend: 0,
+    },
+  });
+  return { ok: true, user: dbToUser(created) };
 }
 
-export function updateUser(id: number, data: Partial<UserData>) {
-  const users = loadUsers();
-  const idx = users.findIndex((u) => u.id === id);
-  if (idx >= 0) { users[idx] = { ...users[idx], ...data }; saveUsers(users); }
+export async function updateUser(id: number, data: Partial<UserData>) {
+  // UserData 의 string enum 들을 DB enum 으로 변환
+  const upd: Record<string, unknown> = {};
+  if (data.username      !== undefined) upd.username      = data.username;
+  if (data.nickname      !== undefined) upd.nickname      = data.nickname;
+  if (data.passwordHash  !== undefined) upd.passwordHash  = data.passwordHash;
+  if (data.role          !== undefined) upd.role          = ROLE_TO_DB[data.role];
+  if (data.status        !== undefined) upd.status        = STATUS_TO_DB[data.status];
+  if (data.level         !== undefined) upd.level         = data.level;
+  if (data.points        !== undefined) upd.points        = data.points;
+  if (data.memo          !== undefined) upd.memo          = data.memo;
+  if (data.shopPostLimit !== undefined) upd.shopPostLimit = data.shopPostLimit ?? null;
+  if (data.lastLoginDate !== undefined) upd.lastLoginDate = data.lastLoginDate ?? null;
+  if (data.lastAttendDate!== undefined) upd.lastAttendDate= data.lastAttendDate ?? null;
+  if (data.attendStreak  !== undefined) upd.attendStreak  = data.attendStreak;
+  if (data.totalAttend   !== undefined) upd.totalAttend   = data.totalAttend;
+  if (data.approvedAt    !== undefined) upd.approvedAt    = data.approvedAt ? new Date(data.approvedAt) : null;
+  if (data.blockedAt     !== undefined) upd.blockedAt     = data.blockedAt  ? new Date(data.blockedAt)  : null;
+
+  await prisma.user.update({ where: { id }, data: upd }).catch(() => {/* 존재 안 함 무시 */});
 }
 
-export function deleteUser(id: number) {
-  saveUsers(loadUsers().filter((u) => u.id !== id));
+export async function deleteUser(id: number) {
+  await prisma.user.delete({ where: { id } }).catch(() => {/* idempotent */});
 }
 
-// ── 포인트 ────────────────────────────────────────────────────────────────────
-function loadPointLogs(): PointLog[] {
-  ensureDir();
-  try {
-    if (!fs.existsSync(POINT_LOGS_PATH)) { fs.writeFileSync(POINT_LOGS_PATH, "[]"); return []; }
-    return JSON.parse(fs.readFileSync(POINT_LOGS_PATH, "utf-8"));
-  } catch { return []; }
-}
+// ── 포인트 (Prisma + 트랜잭션) ────────────────────────────────────────────────
 
-function savePointLogs(logs: PointLog[]) {
-  ensureDir();
-  fs.writeFileSync(POINT_LOGS_PATH, JSON.stringify(logs, null, 2));
-}
-
-export function awardPoints(
+export async function awardPoints(
   userId: number,
   action: PointAction,
   amount: number,
   memo: string
-): number {
-  const users = loadUsers();
-  const idx = users.findIndex((u) => u.id === userId);
-  if (idx < 0) return 0;
-
-  const newBalance = (users[idx].points ?? 0) + amount;
-  users[idx] = { ...users[idx], points: Math.max(0, newBalance) };
-  saveUsers(users);
-
-  const logs = loadPointLogs();
-  const id = logs.length ? Math.max(...logs.map((l) => l.id)) + 1 : 1;
-  logs.unshift({
-    id,
-    userId,
-    username: users[idx].username,
-    action,
-    amount,
-    balance: Math.max(0, newBalance),
-    memo,
-    createdAt: new Date().toISOString(),
+): Promise<number> {
+  const dbAction = ACTION_TO_DB[action] ?? DbPointAction.ETC;
+  // 트랜잭션: User.points 증감 + PointLog 생성을 원자적으로
+  const result = await prisma.$transaction(async (tx) => {
+    const user = await tx.user.findUnique({ where: { id: userId } });
+    if (!user) return 0;
+    const newBalance = Math.max(0, user.points + amount);
+    await tx.user.update({ where: { id: userId }, data: { points: newBalance } });
+    await tx.pointLog.create({
+      data: {
+        userId,
+        username: user.username,
+        action: dbAction,
+        amount,
+        balance: newBalance,
+        memo,
+      },
+    });
+    return newBalance;
   });
-  savePointLogs(logs);
-
-  return Math.max(0, newBalance);
+  return result;
 }
 
-export function getPointLogs(opts: { userId?: number; page?: number; pageSize?: number } = {}) {
+export async function getPointLogs(opts: { userId?: number; page?: number; pageSize?: number } = {}) {
   const { userId, page = 1, pageSize = 20 } = opts;
-  let logs = loadPointLogs();
-  if (userId) logs = logs.filter((l) => l.userId === userId);
-  const total = logs.length;
-  return { logs: logs.slice((page - 1) * pageSize, page * pageSize), total };
+  const where = userId ? { userId } : {};
+  const [rows, total] = await Promise.all([
+    prisma.pointLog.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.pointLog.count({ where }),
+  ]);
+  return { logs: rows.map(dbToPointLog), total };
 }
 
 // ── 출석체크 ──────────────────────────────────────────────────────────────────
@@ -474,14 +522,14 @@ export function getAttendanceByDate(date: string): AttendanceRecord[] {
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
-export function checkAttendance(userId: number): {
+export async function checkAttendance(userId: number): Promise<{
   ok: boolean;
   alreadyChecked: boolean;
   pointAwarded: number;
   streak: number;
-} {
+}> {
   const today = new Date().toISOString().slice(0, 10);
-  const user = getUserById(userId);
+  const user = await getUserById(userId);
   if (!user) return { ok: false, alreadyChecked: false, pointAwarded: 0, streak: 0 };
 
   if (getTodayAttendance(userId)) {
@@ -516,7 +564,7 @@ export function checkAttendance(userId: number): {
   saveAttendance(records);
 
   // 유저 정보 업데이트
-  updateUser(userId, {
+  await updateUser(userId, {
     lastAttendDate: today,
     attendStreak: streak,
     totalAttend: (user.totalAttend ?? 0) + 1,
@@ -524,21 +572,22 @@ export function checkAttendance(userId: number): {
 
   // 포인트 지급
   const memo = streak > 1 ? `출석체크 (${streak}일 연속 +${bonus}p 보너스)` : "출석체크";
-  awardPoints(userId, "attend", pointAwarded, memo);
+  await awardPoints(userId, "attend", pointAwarded, memo);
 
   return { ok: true, alreadyChecked: false, pointAwarded, streak };
 }
 
-export function getAttendanceStats(): { userId: number; username: string; totalAttend: number; streak: number }[] {
-  const users = loadUsers();
-  return users
-    .map((u) => ({
-      userId: u.id,
-      username: u.username,
-      totalAttend: u.totalAttend ?? 0,
-      streak: u.attendStreak ?? 0,
-    }))
-    .sort((a, b) => b.totalAttend - a.totalAttend);
+export async function getAttendanceStats(): Promise<{ userId: number; username: string; totalAttend: number; streak: number }[]> {
+  const users = await prisma.user.findMany({
+    select: { id: true, username: true, totalAttend: true, attendStreak: true },
+    orderBy: { totalAttend: "desc" },
+  });
+  return users.map((u) => ({
+    userId: u.id,
+    username: u.username,
+    totalAttend: u.totalAttend,
+    streak: u.attendStreak,
+  }));
 }
 
 // ── 쿠폰 CRUD ────────────────────────────────────────────────────────────────
@@ -589,7 +638,7 @@ function saveUserCoupons(data: UserCoupon[]) {
   fs.writeFileSync(USER_COUPONS_PATH, JSON.stringify(data, null, 2));
 }
 
-export function claimCoupon(userId: number, couponId: number): { ok: boolean; error?: string } {
+export async function claimCoupon(userId: number, couponId: number): Promise<{ ok: boolean; error?: string }> {
   const coupons = loadCoupons();
   const coupon = coupons.find((c) => c.id === couponId);
   if (!coupon) return { ok: false, error: "쿠폰을 찾을 수 없습니다." };
@@ -607,7 +656,7 @@ export function claimCoupon(userId: number, couponId: number): { ok: boolean; er
     if (count >= coupon.maxIssue) return { ok: false, error: "쿠폰 수량이 소진되었습니다." };
   }
 
-  const user = loadUsers().find((u) => u.id === userId);
+  const user = await getUserById(userId);
   const id = ucs.length ? Math.max(...ucs.map((uc) => uc.id)) + 1 : 1;
   ucs.push({ id, userId, username: user?.username ?? "", couponId, claimedAt: new Date().toISOString().slice(0, 10) });
   saveUserCoupons(ucs);

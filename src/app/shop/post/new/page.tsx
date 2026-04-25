@@ -9,7 +9,7 @@ export default async function NewShopPostPage() {
   if (!session?.user?.id) redirect("/login");
 
   const userId = parseInt(session.user.id);
-  const user = getUserById(userId);
+  const user = await getUserById(userId);
   if (!user || (user.role !== "shop" && user.role !== "admin")) redirect("/");
 
   const limit = user.shopPostLimit ?? 3;

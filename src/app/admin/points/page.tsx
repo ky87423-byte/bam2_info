@@ -22,8 +22,8 @@ export default async function AdminPointsPage({ searchParams }: Props) {
   const filterUserId = params.userId ? parseInt(params.userId) : undefined;
   const PAGE_SIZE = 30;
 
-  const { logs, total } = getPointLogs({ userId: filterUserId, page, pageSize: PAGE_SIZE });
-  const { users } = getUsers("", 1, 999);
+  const { logs, total } = await getPointLogs({ userId: filterUserId, page, pageSize: PAGE_SIZE });
+  const { users } = await getUsers("", 1, 999);
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   const totalAwarded = logs.filter((l) => l.amount > 0).reduce((s, l) => s + l.amount, 0);

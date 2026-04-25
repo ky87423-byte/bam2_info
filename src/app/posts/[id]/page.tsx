@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getShopPostById } from "@/lib/data";
 import { MapPin, Tag, Phone, Smartphone, MessageCircle, Clock, ChevronLeft, DollarSign } from "lucide-react";
+import CommentSection from "@/components/comments/CommentSection";
 
 export default async function PostDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -99,6 +100,9 @@ export default async function PostDetailPage({ params }: { params: Promise<{ id:
           </div>
         </div>
       )}
+
+      {/* ── 댓글 섹션 (홍보 게시판: targetType="promotion") ── */}
+      <CommentSection boardType="promotion" postId={post.id} />
     </div>
   );
 }

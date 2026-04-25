@@ -16,6 +16,28 @@ enum EventType {
   RESERVATION
 }
 
+enum UserRole {
+  USER
+  SHOP
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  BLOCKED
+}
+
+enum PointAction {
+  SIGNUP
+  LOGIN
+  ATTEND
+  POST
+  COMMENT
+  LUCKY
+  ADMIN
+  ETC
+}
+
 // ── Models ────────────────────────────────────────────────────────────────────
 
 model Shop {
@@ -67,4 +89,93 @@ model SearchLog {
   createdAt   DateTime @default(now())
 
   @@index([resultCount])                   // Demand-Supply: 결과 0건 키워드 필터
+}
+
+// ── User / PointLog (JSON 이관) ──────────────────────────────────────────────
+
+model User {
+  id             Int        @id @default(autoincrement())
+  username       String     @unique
+  nickname       String
+  passwordHash   String     @default("")
+  role           UserRole   @default(USER)
+  status         UserStatus @default(ACTIVE)
+  level          Int        @default(1)
+  points         Int        @default(0)
+  memo           String     @default("")
+  shopPostLimit  Int?
+  joinedAt       DateTime   @default(now())
+  approvedAt     DateTime?
+  blockedAt      DateTime?
+  lastLoginDate  String?    @db.VarChar(10)   // YYYY-MM-DD
+  lastAttendDate String?    @db.VarChar(10)
+  attendStreak   Int        @default(0)
+  totalAttend    Int        @default(0)
+
+  pointLogs        PointLog[]
+  comments         Comment[]
+  messagesSent     Message[]  @relation("MessagesSent")
+  messagesReceived Message[]  @relation("MessagesReceived")
+
+  @@index([status])
+  @@index([role])
+}
+
+model PointLog {
+  id        Int         @id @default(autoincrement())
+  userId    Int
+  username  String       // 유저 탈퇴 후 로그 가독성 유지
+  action    PointAction
+  amount    Int          // + 지급, - 차감
+  balance   Int          // 지급 직후 잔액 스냅샷
+  memo      String      @default("")
+  createdAt DateTime    @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
+}
+
+// ── Comment (무한 확장형 polymorphic) ────────────────────────────────────────
+
+model Comment {
+  id          Int       @id @default(autoincrement())
+  targetType  String    @db.VarChar(32)   // 'promotion' | 'free' | 'notice' | ...
+  targetId    Int                            // 해당 게시판의 게시글 id
+  authorId    Int
+  parentId    Int?                           // null = top-level, not null = 답글
+  content     String    @db.Text
+  isLuckyWin  Boolean   @default(false)
+  luckyAmount Int?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?                      // soft delete
+
+  author  User      @relation(fields: [authorId], references: [id])
+  parent  Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies Comment[] @relation("CommentReplies")
+
+  @@index([targetType, targetId, createdAt])
+  @@index([authorId, createdAt])
+  @@index([parentId])
+}
+
+// ── Message (1:1 쪽지 시스템) ───────────────────────────────────────────────
+
+model Message {
+  id         Int      @id @default(autoincrement())
+  content    String   @db.Text
+  senderId   Int
+  receiverId Int
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  sender   User @relation("MessagesSent",     fields: [senderId],   references: [id], onDelete: Cascade)
+  receiver User @relation("MessagesReceived", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@index([receiverId, isRead])         // 안 읽은 쪽지 카운트 (헤더 뱃지)
+  @@index([receiverId, createdAt])      // 받은 쪽지함 최신순
+  @@index([senderId,   createdAt])      // 보낸 쪽지함 최신순
+  @@index([createdAt])                  // 관리자 전체 모니터링
 }

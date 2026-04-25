@@ -10,7 +10,7 @@ interface Props {
 
 export default async function AdminUserDetailPage({ params }: Props) {
   const { id } = await params;
-  const user = getUserById(parseInt(id, 10));
+  const user = await getUserById(parseInt(id, 10));
   if (!user) notFound();
 
   return (

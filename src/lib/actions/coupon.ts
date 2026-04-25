@@ -57,7 +57,7 @@ export async function actionDeleteCoupon(id: number) {
 export async function actionClaimCoupon(couponId: number): Promise<{ ok?: boolean; error?: string }> {
   const session = await auth();
   if (!session?.user?.id) return { error: "로그인이 필요합니다." };
-  const result = claimCoupon(parseInt(session.user.id), couponId);
+  const result = await claimCoupon(parseInt(session.user.id), couponId);
   if (!result.ok) return { error: result.error };
   revalidatePath("/coupons");
   revalidatePath("/mypage");

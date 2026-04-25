@@ -16,7 +16,7 @@ export default async function ShopDashboard() {
   if (!session?.user?.id) redirect("/login");
 
   const authorId = parseInt(session.user.id);
-  const user = getUserById(authorId);
+  const user = await getUserById(authorId);
   if (!user) redirect("/login");
 
   const { posts, total } = getShopPosts({ authorId });

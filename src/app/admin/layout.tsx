@@ -2,7 +2,7 @@ import Link from "next/link";
 import { auth, signOut } from "@/auth";
 import { getShopPosts, getUsers, getShops } from "@/lib/data";
 import {
-  LayoutDashboard, Store, Users, Tag, MessageSquare,
+  LayoutDashboard, Store, Users, Tag, MessageSquare, Mail,
   Ticket, BarChart2, Settings, LogOut, Coins, Calendar, FileText,
 } from "lucide-react";
 import AdminPendingBadge from "./AdminPendingBadge";
@@ -16,6 +16,7 @@ const navItems = [
   { href: "/admin/categories", label: "카테고리 관리", icon: Tag             },
   { href: "/admin/boards",     label: "게시판 관리",   icon: MessageSquare   },
   { href: "/admin/coupons",    label: "쿠폰 / 이벤트", icon: Ticket         },
+  { href: "/admin/messages",   label: "쪽지 관리",     icon: Mail            },
   { href: "/admin/stats",      label: "통계",          icon: BarChart2       },
   { href: "/admin/analytics", label: "분석 대시보드", icon: BarChart2       },
   { href: "/admin/settings",   label: "사이트 설정",   icon: Settings        },
@@ -31,7 +32,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const { total: shopTotal } = getShops("", "", 1, 9999);
 
   // 업소회원 가입 승인 대기
-  const { users: allUsers } = getUsers("", 1, 9999);
+  const { users: allUsers } = await getUsers("", 1, 9999);
   const memberPending = allUsers.filter((u) => u.role === "shop" && u.status === "blocked").length;
 
   return (

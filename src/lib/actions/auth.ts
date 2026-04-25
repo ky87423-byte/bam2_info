@@ -37,12 +37,12 @@ export async function registerAction(
   if (password !== confirm)              return { error: "비밀번호가 일치하지 않습니다.", values };
 
   const passwordHash = await bcrypt.hash(password, 10);
-  const result = createUser({ username, nickname: nickname || username, passwordHash });
+  const result = await createUser({ username, nickname: nickname || username, passwordHash });
   if (!result.ok) return { error: result.error, values };
 
   const settings = getSettings();
   if (settings.pointSignup > 0) {
-    awardPoints(result.user.id, "signup", settings.pointSignup, "회원가입 환영 포인트");
+    await awardPoints(result.user.id, "signup", settings.pointSignup, "회원가입 환영 포인트");
   }
 
   await signIn("credentials", { username, password, redirectTo: "/" });
@@ -88,7 +88,7 @@ export async function shopRegisterAction(
   const passwordHash = await bcrypt.hash(password, 10);
   const memo = `[업소 신청] 업소명: ${company}${category ? ` | 업종: ${category}` : ""}${area ? ` | 지역: ${area}` : ""}${phone ? ` | 연락처: ${phone}` : ""}`;
 
-  const result = createUser({ username, nickname: nickname || username, passwordHash, role: "shop", status: "blocked", memo });
+  const result = await createUser({ username, nickname: nickname || username, passwordHash, role: "shop", status: "blocked", memo });
   if (!result.ok) return { error: result.error, values };
 
   return { success: true };
@@ -103,7 +103,7 @@ export async function loginAction(
   const username = ((formData.get("username") as string) ?? "").trim();
 
   // 업소 신청 승인 대기 중인 계정 사전 체크
-  const candidate = getUserByUsername(username);
+  const candidate = await getUserByUsername(username);
   if (candidate?.role === "shop" && candidate?.status === "blocked") {
     return { error: "업소회원 신청이 승인 대기 중입니다. 관리자 승인 후 로그인 가능합니다." };
   }
@@ -128,7 +128,7 @@ export async function logoutAction() {
 }
 
 export async function attendAction(userId: number) {
-  const result = checkAttendance(userId);
+  const result = await checkAttendance(userId);
   revalidatePath("/attend");
   revalidatePath("/mypage");
   return result;
@@ -139,7 +139,7 @@ export async function adminAwardPointsAction(formData: FormData) {
   const amount = parseInt(formData.get("amount") as string, 10);
   const memo = (formData.get("memo") as string) || "관리자 지급";
   if (!userId || !amount) return;
-  awardPoints(userId, "admin", amount, memo);
+  await awardPoints(userId, "admin", amount, memo);
   revalidatePath("/admin/points");
   revalidatePath("/admin/users");
 }
