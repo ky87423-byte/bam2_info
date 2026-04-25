@@ -16,7 +16,7 @@ export default async function LoginPage() {
         </div>
         <div className="bg-white rounded-2xl shadow-sm border p-6">
           <Suspense>
-            <LoginForm />
+            <LoginForm isDev={process.env.NODE_ENV === "development"} />
           </Suspense>
         </div>
       </div>

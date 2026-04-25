@@ -1,14 +1,20 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useTransition } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { loginAction, type LoginState } from "@/lib/actions/auth";
+import { devLoginAction } from "@/lib/actions/devAuth";
 
-export default function LoginForm() {
+export default function LoginForm({ isDev = false }: { isDev?: boolean }) {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") ?? "/";
   const [state, action, pending] = useActionState<LoginState, FormData>(loginAction, {});
+  const [devPending, startDevTransition] = useTransition();
+
+  const devLogin = (role: "admin" | "shop" | "user") => {
+    startDevTransition(() => { devLoginAction(role); });
+  };
 
   return (
     <form action={action} className="space-y-4">
@@ -58,6 +64,40 @@ export default function LoginForm() {
           회원가입
         </Link>
       </p>
+
+      {isDev && (
+        <div className="mt-6 pt-4 border-t border-dashed border-gray-300">
+          <p className="text-[11px] text-center text-gray-400 mb-2">
+            🛠 DEV ONLY — 비밀번호 검증 없이 즉시 로그인
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              type="button"
+              disabled={devPending}
+              onClick={() => devLogin("admin")}
+              className="py-2 text-xs font-medium rounded-md bg-purple-100 text-purple-700 hover:bg-purple-200 disabled:opacity-60"
+            >
+              관리자
+            </button>
+            <button
+              type="button"
+              disabled={devPending}
+              onClick={() => devLogin("shop")}
+              className="py-2 text-xs font-medium rounded-md bg-blue-100 text-blue-700 hover:bg-blue-200 disabled:opacity-60"
+            >
+              업소
+            </button>
+            <button
+              type="button"
+              disabled={devPending}
+              onClick={() => devLogin("user")}
+              className="py-2 text-xs font-medium rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-60"
+            >
+              일반 유저
+            </button>
+          </div>
+        </div>
+      )}
     </form>
   );
 }
