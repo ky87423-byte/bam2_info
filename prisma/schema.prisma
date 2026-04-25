@@ -57,6 +57,13 @@ enum MainLayout {
   BOARD         // 게시판 (테이블형 — 제목 + 지역 + 카테고리 + 가격)
 }
 
+enum FilterLayout {
+  DOUBLE_TAB    // A: 지역 칩 + 업종 칩 2단
+  DROPDOWN      // B: 셀렉트 박스 2개
+  SIDEBAR       // C: 좌측 사이드바 (페이지 구조 변경)
+  TAB_SWITCH    // D: [업종/지역] 토글 → 하단 칩 그리드 교체
+}
+
 // ── Models ────────────────────────────────────────────────────────────────────
 
 model Shop {
@@ -263,10 +270,11 @@ model ClaimRequest {
 // ── SiteConfig — 사이트 전역 토글 (singleton, id=1 고정) ────────────────────
 
 model SiteConfig {
-  id                     Int        @id @default(1)        // 항상 1
-  isShopCommunityActive  Boolean    @default(false)        // 업소 전용 비밀 게시판 ON/OFF
-  mainLayout             MainLayout @default(GRID)         // 메인 페이지 레이아웃 종류
-  updatedAt              DateTime   @updatedAt
+  id                     Int          @id @default(1)        // 항상 1
+  isShopCommunityActive  Boolean      @default(false)        // 업소 전용 비밀 게시판 ON/OFF
+  mainLayout             MainLayout   @default(GRID)         // 메인 페이지 레이아웃 종류
+  filterLayout           FilterLayout @default(DOUBLE_TAB)   // 메인 필터 영역 UI 종류
+  updatedAt              DateTime     @updatedAt
 }
 
 // ── BoardPost — 일반 게시판 (category 로 다중 게시판 분기, polymorphic) ────

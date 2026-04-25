@@ -257,9 +257,35 @@ export function getAreas(): string[] {
   return Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([a]) => a);
 }
 
-export function getShops(area: string, q: string, page: number, pageSize = PAGE_SIZE) {
+// 필터 UI 용 — 카운트 포함 (정렬·뱃지 표시)
+export function getAreasWithCounts(): { name: string; count: number }[] {
+  const shops = loadShops();
+  const counts: Record<string, number> = {};
+  for (const s of shops) {
+    const area = s.area.replace(/,+$/, "").trim();
+    if (area) counts[area] = (counts[area] ?? 0) + 1;
+  }
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([name, count]) => ({ name, count }));
+}
+
+export function getCategories(): { code: string; count: number }[] {
+  const shops = loadShops();
+  const counts: Record<string, number> = {};
+  for (const s of shops) {
+    const c = (s.category ?? "").trim();
+    if (c) counts[c] = (counts[c] ?? 0) + 1;
+  }
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([code, count]) => ({ code, count }));
+}
+
+export function getShops(area: string, q: string, page: number, pageSize = PAGE_SIZE, category = "") {
   let shops = loadShops();
-  if (area) shops = shops.filter((s) => s.area.includes(area));
+  if (area)     shops = shops.filter((s) => s.area.includes(area));
+  if (category) shops = shops.filter((s) => s.category === category);
   if (q) {
     const lq = q.toLowerCase();
     shops = shops.filter((s) =>

@@ -1,9 +1,10 @@
 import { getSettings } from "@/lib/data";
 import { actionSaveSettings } from "@/lib/actions/settings";
 import { getSiteConfig } from "@/lib/siteConfig";
-import { Settings, Coins, Lock, LayoutGrid, RefreshCw } from "lucide-react";
+import { Settings, Coins, Lock, LayoutGrid, RefreshCw, Filter } from "lucide-react";
 import ShopCommunityToggle from "./ShopCommunityToggle";
 import MainLayoutSwitcher from "./MainLayoutSwitcher";
+import FilterLayoutSwitcher from "./FilterLayoutSwitcher";
 import QuickSyncButton from "./QuickSyncButton";
 
 export default async function AdminSettingsPage() {
@@ -17,14 +18,24 @@ export default async function AdminSettingsPage() {
         <h2 className="text-xl font-bold text-gray-800">사이트 설정</h2>
       </div>
 
-      {/* ── 메인 레이아웃 스위처 (서버 컴포넌트 분기) ── */}
+      {/* ── 메인 레이아웃 스위처 (그리드 종류) ── */}
       <div className="bg-white rounded-xl shadow-sm p-6 mb-4">
         <h3 className="font-semibold text-gray-700 mb-1 pb-2 border-b flex items-center gap-2">
           <LayoutGrid size={14} className="text-indigo-500" />
-          메인 페이지 레이아웃
+          메인 페이지 레이아웃 (그리드 종류)
         </h3>
-        <p className="text-[11px] text-gray-400 mb-4">선택 즉시 메인 페이지(<code className="bg-gray-50 px-1 rounded">/</code>) 갱신 — 페이지 새로고침 시 반영</p>
+        <p className="text-[11px] text-gray-400 mb-4">선택 즉시 메인 페이지(<code className="bg-gray-50 px-1 rounded">/</code>) 갱신</p>
         <MainLayoutSwitcher initialLayout={config.mainLayout} />
+      </div>
+
+      {/* ── 필터 영역 스위처 (4종 — dynamic import 로 chunk 분리) ── */}
+      <div className="bg-white rounded-xl shadow-sm p-6 mb-4">
+        <h3 className="font-semibold text-gray-700 mb-1 pb-2 border-b flex items-center gap-2">
+          <Filter size={14} className="text-yellow-500" />
+          메인 필터 영역 (4종)
+        </h3>
+        <p className="text-[11px] text-gray-400 mb-4">활성 레이아웃 chunk 만 다운로드 — 나머지 3종은 미로드 (성능 최적화)</p>
+        <FilterLayoutSwitcher initialFilter={config.filterLayout} />
       </div>
 
       {/* ── 동기화 빠른 실행 ── */}
