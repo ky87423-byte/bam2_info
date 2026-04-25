@@ -7,6 +7,9 @@ import { getShopById } from "@/lib/data";
 import { recordAnalyticsEvent, extractIpFromHeaders } from "@/lib/api/events";
 import { EventType } from "@/generated/prisma/enums";
 import ContactButtons from "./ContactButtons";
+import ClaimListingBanner from "@/components/shop/ClaimListingBanner";
+import InquiryButton from "@/components/shop/InquiryButton";
+import CommentSection from "@/components/comments/CommentSection";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -29,6 +32,10 @@ export default async function ShopDetailPage({ params }: Props) {
     // DB 미연결 시 무시
   }
 
+  // /shop/[id] 의 모든 데이터는 현재 스크래퍼 출처 (data/shops.json) → 클레임 배너 노출.
+  // 추후 회원이 직접 등록한 Shop이 생기면 isScraped 플래그로 분기.
+  const isScraped = true;
+
   const areaClean = shop.area.replace(/,+$/, "").trim();
   const allPhotos = [
     ...(shop.mainPhoto ? [shop.mainPhoto] : []),
@@ -46,6 +53,9 @@ export default async function ShopDetailPage({ params }: Props) {
       <Link href="/" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 mb-4">
         <ChevronLeft size={16} /> 목록으로
       </Link>
+
+      {/* 스크랩 업소 클레임 배너 (Phase 1 — 안내 모달, 클레임 폼은 Phase 2) */}
+      {isScraped && <ClaimListingBanner shopId={shop.id} company={shop.company} />}
 
       <div className="bg-white rounded-2xl shadow p-6">
         <div className="flex items-start justify-between gap-4 mb-4">
@@ -77,6 +87,13 @@ export default async function ShopDetailPage({ params }: Props) {
           hphone={shop.hphone}
           telegram={shop.telegram}
         />
+
+        {/* 운영자 통한 문의 (스크랩 업소 = 가상 user → AdminInquiry 우회) */}
+        {isScraped && (
+          <div className="mt-3">
+            <InquiryButton shopId={shop.id} company={shop.company} />
+          </div>
+        )}
 
         <div className="flex flex-wrap gap-4 text-sm text-gray-500 mb-6">
           {timeLabel && (
@@ -116,6 +133,9 @@ export default async function ShopDetailPage({ params }: Props) {
           </div>
         )}
       </div>
+
+      {/* 댓글 섹션 — targetType="shop" 으로 /posts 의 promotion 댓글과 분리 */}
+      <CommentSection boardType="shop" postId={shop.id} />
     </div>
   );
 }

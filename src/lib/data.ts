@@ -61,6 +61,7 @@ export interface UserData {
   lastAttendDate?: string;
   attendStreak?: number;
   totalAttend?: number;
+  isVirtual?: boolean;          // true = 스크랩 업소를 위한 자동 생성 가상 계정 (로그인 불가)
 }
 
 export type PointAction = "signup" | "login" | "attend" | "post" | "comment" | "admin" | "etc";
@@ -349,6 +350,7 @@ function dbToUser(u: NonNullable<DbUser>): UserData {
     lastAttendDate: u.lastAttendDate ?? undefined,
     attendStreak: u.attendStreak,
     totalAttend:  u.totalAttend,
+    isVirtual:    u.isVirtual,
   };
 }
 
@@ -365,13 +367,15 @@ function dbToPointLog(l: NonNullable<DbPointLog>): PointLog {
   };
 }
 
-export async function getUsers(q = "", page = 1, pageSize = 20) {
+export async function getUsers(q = "", page = 1, pageSize = 20, opts: { includeVirtual?: boolean } = {}) {
+  // 가상 계정(스크랩 업소용)은 기본 제외 — admin/users 페이지·통계 오염 방지
+  const baseWhere = opts.includeVirtual ? {} : { isVirtual: false };
   const where = q
-    ? { OR: [
+    ? { ...baseWhere, OR: [
         { username: { contains: q, mode: "insensitive" as const } },
         { nickname: { contains: q, mode: "insensitive" as const } },
       ]}
-    : {};
+    : baseWhere;
   const [rows, total] = await Promise.all([
     prisma.user.findMany({
       where,

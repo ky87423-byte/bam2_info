@@ -17,6 +17,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         const user = await getUserByUsername(credentials.username as string);
         if (!user || user.status === "blocked") return null;
+        if (user.isVirtual) return null;     // 가상 계정 로그인 차단 (이중 방어)
         if (!user.passwordHash) return null;
 
         const valid = await bcrypt.compare(credentials.password as string, user.passwordHash);

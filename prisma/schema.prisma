@@ -38,34 +38,55 @@ enum PointAction {
   ETC
 }
 
+enum InquiryStatus {
+  NEW           // 신규 — 미확인
+  REVIEWED      // admin 확인함
+  FORWARDED     // admin이 업주에게 외부 연락 시도
+  RESOLVED      // 처리 완료
+}
+
+enum ClaimStatus {
+  PENDING       // 신청 대기
+  APPROVED      // admin 승인 → Shop.ownerId 설정됨
+  REJECTED      // admin 거절
+}
+
 // ── Models ────────────────────────────────────────────────────────────────────
 
 model Shop {
-  id          Int      @id @default(autoincrement())
-  company     String
-  subject     String   @db.Text
-  content     String   @db.Text
-  area        String
-  category    String   @default("")
-  category2   String   @default("")
-  phone       String   @default("")
-  hphone      String   @default("")
-  telegram    String   @default("")
-  hit         Int      @default(0)
-  price       Int      @default(0)
-  mainPhoto   String   @default("")
-  photos      String[]
-  time1       String   @default("")
-  time2       String   @default("")
-  timeFull    Boolean  @default(false)
-  isVisible   Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  lastLoginAt DateTime?
+  id            Int      @id @default(autoincrement())
+  company       String
+  subject       String   @db.Text
+  content       String   @db.Text
+  area          String
+  category      String   @default("")
+  category2     String   @default("")
+  phone         String   @default("")
+  hphone        String   @default("")
+  telegram      String   @default("")
+  hit           Int      @default(0)
+  price         Int      @default(0)
+  mainPhoto     String   @default("")
+  photos        String[]
+  time1         String   @default("")
+  time2         String   @default("")
+  timeFull      Boolean  @default(false)
+  isVisible     Boolean  @default(true)
+  isScraped     Boolean  @default(true)   // 스크랩 출처 여부 (false = 회원이 직접 등록)
+  virtualUserId Int?     @unique           // 자동 생성된 가상 User 계정 (1:1, lazy)
+  ownerId       Int?                        // 클레임 승인 후 실 소유주 (real User)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  lastLoginAt   DateTime?
 
+  owner           User?            @relation("ShopOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   analyticsEvents AnalyticsEvent[]
+  inquiries       AdminInquiry[]
+  claims          ClaimRequest[]
 
   @@index([lastLoginAt])                   // Retention: 미접속 업주 필터
+  @@index([isScraped])                     // 스크랩 vs 회원 등록 구분 조회
+  @@index([ownerId])                       // 특정 회원 소유 업소 조회
 }
 
 model AnalyticsEvent {
@@ -112,13 +133,20 @@ model User {
   attendStreak   Int        @default(0)
   totalAttend    Int        @default(0)
 
+  isVirtual      Boolean    @default(false)   // 스크랩 업소를 위한 자동 생성 가상 계정
+                                                // (passwordHash="", isVirtual=true → 로그인 불가)
+
   pointLogs        PointLog[]
   comments         Comment[]
-  messagesSent     Message[]  @relation("MessagesSent")
-  messagesReceived Message[]  @relation("MessagesReceived")
+  messagesSent     Message[]      @relation("MessagesSent")
+  messagesReceived Message[]      @relation("MessagesReceived")
+  shopsOwned       Shop[]         @relation("ShopOwner")
+  inquiriesSent    AdminInquiry[] @relation("InquirySender")
+  claimsRequested  ClaimRequest[] @relation("ClaimRequester")
 
   @@index([status])
   @@index([role])
+  @@index([isVirtual])                          // /admin/users 등에서 빠른 필터링
 }
 
 model PointLog {
@@ -178,4 +206,46 @@ model Message {
   @@index([receiverId, createdAt])      // 받은 쪽지함 최신순
   @@index([senderId,   createdAt])      // 보낸 쪽지함 최신순
   @@index([createdAt])                  // 관리자 전체 모니터링
+}
+
+// ── AdminInquiry — 가상 업소 수신 쪽지 우회 저장소 ─────────────────────────
+
+model AdminInquiry {
+  id            Int            @id @default(autoincrement())
+  senderId      Int                                        // 보낸 (실제) 회원
+  shopId        Int                                        // 어느 업소에 보낸 문의인지
+  virtualUserId Int?                                       // 우회 시점의 가상 user (참고용)
+  content       String         @db.Text
+  status        InquiryStatus  @default(NEW)
+  adminNote     String         @default("")                // admin 영업 결과 등 메모
+  createdAt     DateTime       @default(now())
+  reviewedAt    DateTime?
+
+  sender User @relation("InquirySender", fields: [senderId], references: [id], onDelete: Cascade)
+  shop   Shop @relation(fields: [shopId],   references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])     // admin 화면: 신규 인콰이어리 우선
+  @@index([shopId, createdAt])     // 특정 업소 인콰이어리 이력
+  @@index([senderId, createdAt])   // 사용자 본인이 보낸 문의 내역
+}
+
+// ── ClaimRequest — 업소 소유권 주장 신청 ──────────────────────────────────
+
+model ClaimRequest {
+  id           Int          @id @default(autoincrement())
+  shopId       Int                                          // 클레임 대상 업소
+  claimantId   Int                                          // 신청자 (실 회원)
+  status       ClaimStatus  @default(PENDING)
+  proofText    String       @db.Text                        // 증빙 본문 (사업자번호·매장 사진 설명 등)
+  contactPhone String       @default("")                    // 검증 콜백용
+  adminNote    String       @default("")                    // admin 검토 메모
+  createdAt    DateTime     @default(now())
+  reviewedAt   DateTime?
+
+  shop     Shop @relation(fields: [shopId],     references: [id], onDelete: Cascade)
+  claimant User @relation("ClaimRequester", fields: [claimantId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])     // admin 검토 큐
+  @@index([shopId])                // 같은 업소 중복 신청 체크
+  @@index([claimantId, createdAt]) // 사용자가 신청한 클레임 내역
 }

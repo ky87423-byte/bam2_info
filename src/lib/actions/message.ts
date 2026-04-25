@@ -14,8 +14,16 @@ export type ActionResult<T = void> =
   | { ok: true; data?: T }
   | { ok: false; error: string };
 
-// ── 쪽지 발송 ─────────────────────────────────────────────────────────────
-export async function sendMessageAction(input: SendMessageInput): Promise<ActionResult<{ id: number }>> {
+// 발송 결과 — 가상 수신자(스크랩 업소) 우회 시 isInquiry=true 로 클라이언트 알림
+export interface SendMessageResult {
+  id:         number;
+  isInquiry:  boolean;       // true = AdminInquiry 로 우회 저장됨
+  shopId?:    number;        // 우회 시 어느 업소로 향한 문의인지
+  shopName?:  string;
+}
+
+// ── 쪽지 발송 (가상 수신자 자동 우회) ────────────────────────────────────
+export async function sendMessageAction(input: SendMessageInput): Promise<ActionResult<SendMessageResult>> {
   const session = await auth();
   if (!session?.user?.id) return { ok: false, error: "로그인이 필요합니다." };
   const senderId = parseInt(session.user.id, 10);
@@ -31,17 +39,52 @@ export async function sendMessageAction(input: SendMessageInput): Promise<Action
 
   const receiver = await prisma.user.findUnique({
     where: { id: input.receiverId },
-    select: { id: true, status: true },
+    select: { id: true, status: true, isVirtual: true },
   });
   if (!receiver) return { ok: false, error: "받는 사람을 찾을 수 없습니다." };
 
+  // ── 우회 분기: 수신자가 가상 계정이면 AdminInquiry 로 저장 ──
+  if (receiver.isVirtual) {
+    const shop = await prisma.shop.findUnique({
+      where:  { virtualUserId: receiver.id },
+      select: { id: true, company: true, ownerId: true },
+    });
+    if (!shop) {
+      return { ok: false, error: "가상 계정과 연결된 업소를 찾을 수 없습니다." };
+    }
+
+    // 만약 클레임이 이미 승인되어 owner가 있다면, owner에게 직접 쪽지로 전달
+    if (shop.ownerId && shop.ownerId !== senderId) {
+      const direct = await prisma.message.create({
+        data: { senderId, receiverId: shop.ownerId, content },
+        select: { id: true },
+      });
+      revalidatePath("/mypage/messages");
+      return { ok: true, data: { id: direct.id, isInquiry: false, shopId: shop.id, shopName: shop.company } };
+    }
+
+    // 아직 ownerless → 관리자 인콰이어리로 우회
+    const inquiry = await prisma.adminInquiry.create({
+      data: {
+        senderId,
+        shopId:        shop.id,
+        virtualUserId: receiver.id,
+        content,
+      },
+      select: { id: true },
+    });
+    revalidatePath("/admin/inquiries");
+    return { ok: true, data: { id: inquiry.id, isInquiry: true, shopId: shop.id, shopName: shop.company } };
+  }
+
+  // ── 일반 경로: 실 회원 → 회원 ──
   const msg = await prisma.message.create({
     data: { senderId, receiverId: input.receiverId, content },
     select: { id: true },
   });
 
   revalidatePath("/mypage/messages");
-  return { ok: true, data: { id: msg.id } };
+  return { ok: true, data: { id: msg.id, isInquiry: false } };
 }
 
 // ── 쪽지 읽음 처리 ─────────────────────────────────────────────────────────
