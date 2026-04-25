@@ -51,6 +51,12 @@ enum ClaimStatus {
   REJECTED      // admin 거절
 }
 
+enum MainLayout {
+  GRID          // 그리드 (썸네일 카드 다열)
+  LIST_CARD     // 리스트 카드 (가로형 한 줄당 한 업소)
+  BOARD         // 게시판 (테이블형 — 제목 + 지역 + 카테고리 + 가격)
+}
+
 // ── Models ────────────────────────────────────────────────────────────────────
 
 model Shop {
@@ -257,9 +263,10 @@ model ClaimRequest {
 // ── SiteConfig — 사이트 전역 토글 (singleton, id=1 고정) ────────────────────
 
 model SiteConfig {
-  id                     Int      @id @default(1)        // 항상 1
-  isShopCommunityActive  Boolean  @default(false)        // 업소 전용 비밀 게시판 ON/OFF
-  updatedAt              DateTime @updatedAt
+  id                     Int        @id @default(1)        // 항상 1
+  isShopCommunityActive  Boolean    @default(false)        // 업소 전용 비밀 게시판 ON/OFF
+  mainLayout             MainLayout @default(GRID)         // 메인 페이지 레이아웃 종류
+  updatedAt              DateTime   @updatedAt
 }
 
 // ── BoardPost — 일반 게시판 (category 로 다중 게시판 분기, polymorphic) ────

@@ -1,8 +1,10 @@
 import { getSettings } from "@/lib/data";
 import { actionSaveSettings } from "@/lib/actions/settings";
 import { getSiteConfig } from "@/lib/siteConfig";
-import { Settings, Coins, Lock } from "lucide-react";
+import { Settings, Coins, Lock, LayoutGrid, RefreshCw } from "lucide-react";
 import ShopCommunityToggle from "./ShopCommunityToggle";
+import MainLayoutSwitcher from "./MainLayoutSwitcher";
+import QuickSyncButton from "./QuickSyncButton";
 
 export default async function AdminSettingsPage() {
   const s = getSettings();
@@ -13,6 +15,26 @@ export default async function AdminSettingsPage() {
       <div className="flex items-center gap-3 mb-6">
         <Settings size={20} className="text-gray-600" />
         <h2 className="text-xl font-bold text-gray-800">사이트 설정</h2>
+      </div>
+
+      {/* ── 메인 레이아웃 스위처 (서버 컴포넌트 분기) ── */}
+      <div className="bg-white rounded-xl shadow-sm p-6 mb-4">
+        <h3 className="font-semibold text-gray-700 mb-1 pb-2 border-b flex items-center gap-2">
+          <LayoutGrid size={14} className="text-indigo-500" />
+          메인 페이지 레이아웃
+        </h3>
+        <p className="text-[11px] text-gray-400 mb-4">선택 즉시 메인 페이지(<code className="bg-gray-50 px-1 rounded">/</code>) 갱신 — 페이지 새로고침 시 반영</p>
+        <MainLayoutSwitcher initialLayout={config.mainLayout} />
+      </div>
+
+      {/* ── 동기화 빠른 실행 ── */}
+      <div className="bg-white rounded-xl shadow-sm p-6 mb-4">
+        <h3 className="font-semibold text-gray-700 mb-1 pb-2 border-b flex items-center gap-2">
+          <RefreshCw size={14} className="text-blue-500" />
+          데이터 동기화
+        </h3>
+        <p className="text-[11px] text-gray-400 mb-4">scraped_data/shops.json → DB 스마트 upsert (externalId 기준)</p>
+        <QuickSyncButton />
       </div>
 
       {/* ── 비밀 게시판 토글 (별도 form, 즉시 저장) ── */}
