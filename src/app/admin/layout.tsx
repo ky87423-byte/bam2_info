@@ -2,7 +2,7 @@ import Link from "next/link";
 import { auth, signOut } from "@/auth";
 import { getShopPosts, getUsers, getShops } from "@/lib/data";
 import {
-  LayoutDashboard, Store, Users, Tag, MessageSquare, Mail, Inbox, ShieldCheck,
+  LayoutDashboard, Store, Users, Tag, MessageSquare, Mail, Inbox, ShieldCheck, RefreshCw,
   Ticket, BarChart2, Settings, LogOut, Coins, Calendar, FileText,
 } from "lucide-react";
 import AdminPendingBadge from "./AdminPendingBadge";
@@ -19,6 +19,7 @@ const navItems = [
   { href: "/admin/messages",   label: "쪽지 관리",     icon: Mail            },
   { href: "/admin/inquiries",  label: "업소 문의함",   icon: Inbox           },
   { href: "/admin/claims",     label: "소유권 신청",   icon: ShieldCheck     },
+  { href: "/admin/sync",       label: "데이터 동기화", icon: RefreshCw       },
   { href: "/admin/stats",      label: "통계",          icon: BarChart2       },
   { href: "/admin/analytics", label: "분석 대시보드", icon: BarChart2       },
   { href: "/admin/settings",   label: "사이트 설정",   icon: Settings        },
