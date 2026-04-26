@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { Search, Calendar, User, LogOut, LogIn, UserPlus, Coins, Store, Tag, Ticket, Shield, Lock } from "lucide-react";
+import { Search, Calendar, User, LogOut, LogIn, UserPlus, Store, Tag, Ticket, Shield, Lock } from "lucide-react";
 import { auth } from "@/auth";
 import { logoutAction } from "@/lib/actions/auth";
 import { getUserById, getSettings } from "@/lib/data";
 import { getSiteConfig } from "@/lib/siteConfig";
 import UnreadMessageBadge from "./messages/UnreadMessageBadge";
+import PointsBadge from "./PointsBadge";
 
 export default async function Header() {
   const session  = await auth();
@@ -91,11 +92,7 @@ export default async function Header() {
                 </Link>
               )}
               <UnreadMessageBadge />
-              <Link href="/mypage"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-white/70 hover:text-white hover:bg-white/10 transition-colors">
-                <Coins size={13} className="text-yellow-400" />
-                <span className="text-yellow-400 font-semibold">{user.points.toLocaleString()}P</span>
-              </Link>
+              <PointsBadge initial={user.points} />
               <Link href="/mypage"
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-white/70 hover:text-white hover:bg-white/10 transition-colors">
                 <User size={14} />

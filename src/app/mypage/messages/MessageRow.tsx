@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import { markMessageReadAction, deleteMessageAction } from "@/lib/actions/message";
+import { notifyBadge } from "@/lib/useLiveBadge";
 import UserActionMenu from "@/components/users/UserActionMenu";
 
 interface Counterpart {
@@ -37,6 +38,7 @@ export default function MessageRow({
         startTrans(async () => {
           await markMessageReadAction(messageId);
           setReadOpt(true);
+          notifyBadge("unread-msg");  // 헤더 미독 배지 즉시 갱신
         });
       }
       return next;

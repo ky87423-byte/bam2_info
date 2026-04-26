@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
+import { useLiveBadge } from "@/lib/useLiveBadge";
 
 function playAlert(ctx: AudioContext) {
   const t = ctx.currentTime;
@@ -21,77 +22,29 @@ function playAlert(ctx: AudioContext) {
 interface Props {
   initialCount: number;
   pollUrl:      string;
-  /**
-   * localStorage 키. 설정 시 매 fetch 마다 ?since=<localStorage[key]> 자동 부착.
-   * 해당 키 갱신 이벤트('storage' / CustomEvent('admin-badge-refresh')) 감지 시 즉시 재조회.
-   * (예: 쪽지 — admin 이 /admin/messages 진입하면 키 갱신 → 배지 즉시 0 으로 사라짐)
-   */
-  sinceLocalStorageKey?: string;
+  channel:      string;     // useLiveBadge 동기화 채널 (예: "admin:msg-ack")
 }
 
-export default function AdminPendingBadge({ initialCount, pollUrl, sinceLocalStorageKey }: Props) {
-  const [count, setCount] = useState(initialCount);
+export default function AdminPendingBadge({ initialCount, pollUrl, channel }: Props) {
+  const { count } = useLiveBadge({ initial: initialCount, fetchUrl: pollUrl, channel });
   const audioCtxRef   = useRef<AudioContext | null>(null);
   const soundTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pollTimerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const fetchCount = useCallback(async () => {
-    try {
-      let url = pollUrl;
-      if (sinceLocalStorageKey) {
-        const since = typeof window !== "undefined" ? window.localStorage.getItem(sinceLocalStorageKey) : null;
-        if (since) url += (url.includes("?") ? "&" : "?") + "since=" + encodeURIComponent(since);
-      }
-      const res  = await fetch(url, { cache: "no-store" });
-      const data = await res.json();
-      setCount(data.count ?? 0);
-    } catch { /* 무시 */ }
-  }, [pollUrl, sinceLocalStorageKey]);
-
-  // 30초마다 폴링
-  useEffect(() => {
-    pollTimerRef.current = setInterval(fetchCount, 30_000);
-    return () => { if (pollTimerRef.current) clearInterval(pollTimerRef.current); };
-  }, [fetchCount]);
-
-  // localStorage 키 갱신 이벤트 → 즉시 재조회 (cross-tab + same-tab)
-  useEffect(() => {
-    if (!sinceLocalStorageKey) return;
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === sinceLocalStorageKey) fetchCount();
-    };
-    const onCustom = (e: Event) => {
-      const detail = (e as CustomEvent<string>).detail;
-      if (!detail || detail === sinceLocalStorageKey) fetchCount();
-    };
-    window.addEventListener("storage", onStorage);
-    window.addEventListener("admin-badge-refresh", onCustom as EventListener);
-    return () => {
-      window.removeEventListener("storage", onStorage);
-      window.removeEventListener("admin-badge-refresh", onCustom as EventListener);
-    };
-  }, [sinceLocalStorageKey, fetchCount]);
-
-  // count 변화 → 알림음 on/off
+  // count 변화 → 알림음 on/off (15초 반복)
   useEffect(() => {
     if (soundTimerRef.current) { clearInterval(soundTimerRef.current); soundTimerRef.current = null; }
-
     if (count <= 0) return;
-
     if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
     const ctx = audioCtxRef.current;
-
     const fire = () => { if (ctx.state === "suspended") ctx.resume(); playAlert(ctx); };
     fire();
     soundTimerRef.current = setInterval(fire, 15_000);
-
     return () => { if (soundTimerRef.current) clearInterval(soundTimerRef.current); };
   }, [count]);
 
   if (count <= 0) return null;
 
   return (
-    // pointer-events-none: 배지 클릭이 부모 Link를 방해하지 않음
     <span className="relative inline-flex items-center justify-center shrink-0 pointer-events-none">
       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
       <span className="relative inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold px-1 leading-none select-none">

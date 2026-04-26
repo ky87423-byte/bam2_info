@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { Trash2, CheckCircle2, Circle, Shield, Store, Check } from "lucide-react";
 import { deleteMessageAction, acknowledgeMessageAction } from "@/lib/actions/message";
+import { notifyBadge } from "@/lib/useLiveBadge";
 
 interface UserBrief {
   id: number;
@@ -50,8 +51,7 @@ export default function AdminMessageRow({ id, createdAt, sender, receiver, conte
       const res = await acknowledgeMessageAction(id);
       if (res.ok) {
         setAcked(true);
-        // 사이드바 배지 즉시 재조회 → 1 차감
-        window.dispatchEvent(new CustomEvent("admin-badge-refresh"));
+        notifyBadge("admin:msg-ack");   // 사이드바 배지 즉시 재조회 → 1 차감 (cross-tab 포함)
       }
     });
   };

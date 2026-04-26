@@ -71,6 +71,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                 <AdminPendingBadge
                   initialCount={shopPostPending}
                   pollUrl="/api/admin/shop-posts-pending"
+                  channel="admin:shop-post-pending"
                 />
               )}
 
@@ -79,6 +80,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                 <AdminPendingBadge
                   initialCount={memberPending}
                   pollUrl="/api/admin/pending-count"
+                  channel="admin:member-pending"
                 />
               )}
 
@@ -87,6 +89,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                 <AdminPendingBadge
                   initialCount={messagesUnacked}
                   pollUrl="/api/admin/messages-new-count"
+                  channel="admin:msg-ack"
                 />
               )}
 
@@ -95,6 +98,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                 <AdminPendingBadge
                   initialCount={inquiriesNew}
                   pollUrl="/api/admin/inquiries-new-count"
+                  channel="admin:inquiry-new"
                 />
               )}
 
@@ -103,6 +107,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                 <AdminPendingBadge
                   initialCount={claimsPending}
                   pollUrl="/api/admin/claims-pending-count"
+                  channel="admin:claim-pending"
                 />
               )}
             </Link>

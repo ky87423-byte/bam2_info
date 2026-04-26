@@ -2,6 +2,7 @@
 
 import { useTransition, useState } from "react";
 import { attendAction } from "@/lib/actions/auth";
+import { notifyBadge } from "@/lib/useLiveBadge";
 import { CheckCircle, Calendar } from "lucide-react";
 
 interface Props {
@@ -20,6 +21,7 @@ export default function AttendButton({ userId, alreadyChecked }: Props) {
       if (res.ok) {
         setDone(true);
         setResult({ pointAwarded: res.pointAwarded, streak: res.streak });
+        notifyBadge("points");   // 헤더 포인트 배지 즉시 갱신 (다른 탭 포함)
       }
     });
   };
