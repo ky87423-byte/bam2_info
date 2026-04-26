@@ -4,7 +4,7 @@ import ShopCard from "@/components/ShopCard";
 import ShopListCard from "@/components/ShopListCard";
 import ShopBoardTable from "@/components/ShopBoardRow";
 import Pagination from "@/components/Pagination";
-import { getAreasWithCounts, getBizTypes, getShops } from "@/lib/data";
+import { getRegionGroups, getBizTypes, getShops } from "@/lib/data";
 import { getSiteConfig } from "@/lib/siteConfig";
 
 // ── 필터 컴포넌트 — dynamic import (활성 레이아웃 chunk 만 다운로드) ─────
@@ -18,20 +18,21 @@ const FILTER_COMPONENTS = {
 const PAGE_SIZE = 20;
 
 interface Props {
-  searchParams: Promise<{ area?: string; bizType?: string; q?: string; page?: string }>;
+  searchParams: Promise<{ region?: string; area?: string; bizType?: string; q?: string; page?: string }>;
 }
 
 export default async function HomePage({ searchParams }: Props) {
   const params  = await searchParams;
+  const region  = params.region  ?? "";
   const area    = params.area    ?? "";
   const bizType = params.bizType ?? "";
   const q       = params.q       ?? "";
   const page    = Math.max(1, parseInt(params.page ?? "1", 10));
 
-  const [areas, bizTypes, shopsResult, config] = await Promise.all([
-    Promise.resolve(getAreasWithCounts()),
+  const [regionGroups, bizTypes, shopsResult, config] = await Promise.all([
+    Promise.resolve(getRegionGroups()),
     Promise.resolve(getBizTypes()),
-    Promise.resolve(getShops(area, q, page, PAGE_SIZE, bizType)),
+    Promise.resolve(getShops(area, q, page, PAGE_SIZE, bizType, region)),
     getSiteConfig(),
   ]);
   const { shops, total } = shopsResult;
@@ -56,13 +57,14 @@ export default async function HomePage({ searchParams }: Props) {
     </div>
   );
 
-  // 결과 헤더 + 페이지네이션 (모든 레이아웃 공통)
+  // 결과 헤더 — 광역/세부/업종/검색어 표시
+  const regionLabel = area || regionGroups.find((g) => g.code === region)?.name || "";
   const resultHeader = (
     <div className="flex items-center justify-between mb-4">
       <h2 className="text-sm text-gray-500">
-        {area    ? <><span className="font-bold text-gray-800">{area}</span> · </>     : ""}
-        {bizType ? <><span className="font-bold text-gray-800">#{bizType}</span> · </> : ""}
-        {q       ? <><span className="font-bold text-gray-800">&quot;{q}&quot;</span> 검색 결과 · </> : ""}
+        {regionLabel ? <><span className="font-bold text-gray-800">{regionLabel}</span> · </> : ""}
+        {bizType     ? <><span className="font-bold text-gray-800">#{bizType}</span> · </>     : ""}
+        {q           ? <><span className="font-bold text-gray-800">&quot;{q}&quot;</span> 검색 결과 · </> : ""}
         총 <span className="font-bold text-gray-800">{total.toLocaleString()}</span>개
       </h2>
     </div>
@@ -78,13 +80,10 @@ export default async function HomePage({ searchParams }: Props) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-6">
         <div className="lg:grid lg:grid-cols-[240px_1fr] lg:gap-6">
-          {/* 사이드바 — 다크 테마 컨테이너 */}
-          <aside className="bg-[#1a1a2e] text-white rounded-2xl p-4 mb-4 lg:mb-0 lg:p-0 lg:bg-transparent lg:rounded-none">
-            <div className="lg:bg-[#1a1a2e] lg:rounded-2xl lg:p-4">
-              <Suspense fallback={<div className="h-40" />}>
-                <FilterComp areas={areas} bizTypes={bizTypes} />
-              </Suspense>
-            </div>
+          <aside className="mb-4 lg:mb-0">
+            <Suspense fallback={<div className="h-40" />}>
+              <FilterComp regionGroups={regionGroups} bizTypes={bizTypes} />
+            </Suspense>
           </aside>
           <main className="min-w-0">
             {resultHeader}
@@ -101,7 +100,7 @@ export default async function HomePage({ searchParams }: Props) {
     <div className="max-w-7xl mx-auto px-4 py-6">
       <div className="bg-[#1a1a2e] text-white rounded-2xl p-4 mb-5">
         <Suspense fallback={<div className="h-12" />}>
-          <FilterComp areas={areas} bizTypes={bizTypes} />
+          <FilterComp regionGroups={regionGroups} bizTypes={bizTypes} />
         </Suspense>
       </div>
       {resultHeader}

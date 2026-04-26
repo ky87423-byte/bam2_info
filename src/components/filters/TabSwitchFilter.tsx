@@ -1,34 +1,39 @@
 "use client";
 
 import { useState } from "react";
-import { MapPin, Tag, X } from "lucide-react";
+import { MapPin, Tag, X, ArrowLeft } from "lucide-react";
 import { useFilterParams, type FilterProps } from "./filterUtils";
 
 type Tab = "AREA" | "BIZ";
 
 /**
- * Type D — 탭 스위칭
- * 상단 [업종 / 지역] 토글 버튼 → 선택된 탭의 칩 그리드만 표시.
- * 활성 필터(area·bizType)는 토글 위에 작게 노출 (현재 선택 시각화).
+ * Type D — 탭 스위칭 (지역 탭에 2단 hierarchy)
+ *   상단 [지역 / 업종] 토글.
+ *   지역 탭: 광역 그룹 칩 그리드 → 광역 클릭 시 해당 그룹 세부 칩으로 교체 (← 뒤로 버튼 제공)
+ *   업종 탭: 단일 칩 그리드.
  */
-export default function TabSwitchFilter({ areas, bizTypes }: FilterProps) {
-  const { area, bizType, update } = useFilterParams();
-  const [tab, setTab] = useState<Tab>(bizType ? "BIZ" : "AREA");
-  const hasFilter = !!area || !!bizType;
+export default function TabSwitchFilter({ regionGroups, bizTypes }: FilterProps) {
+  const { region, area, bizType, update } = useFilterParams();
+  const [tab, setTab] = useState<Tab>(bizType && !region ? "BIZ" : "AREA");
+  // 지역 탭 내부 단계: region 선택됐으면 자동으로 세부 단계
+  const [showSubAreas, setShowSubAreas] = useState<boolean>(!!region);
+  const activeGroup = regionGroups.find((g) => g.code === region);
+  const hasFilter = !!region || !!area || !!bizType;
+
+  const activeLabel = area || activeGroup?.name || "";
 
   return (
     <div className="space-y-3">
-      {/* 탭 토글 */}
-      <div className="flex items-center gap-2">
+      {/* 탭 토글 + 활성 칩 */}
+      <div className="flex items-center gap-2 flex-wrap">
         <div className="inline-flex bg-white/10 rounded-xl p-1">
           <TabButton active={tab === "AREA"} onClick={() => setTab("AREA")} icon={MapPin} label="지역" />
           <TabButton active={tab === "BIZ"}  onClick={() => setTab("BIZ")}  icon={Tag}    label="업종" />
         </div>
 
-        {/* 현재 선택 칩들 (없으면 안 보임) */}
-        {area && (
-          <ActiveChip onRemove={() => update({ area: "" })}>
-            <MapPin size={10} /> {area}
+        {activeLabel && (
+          <ActiveChip onRemove={() => { update({ region: "", area: "" }); setShowSubAreas(false); }}>
+            <MapPin size={10} /> {activeLabel}
           </ActiveChip>
         )}
         {bizType && (
@@ -39,7 +44,7 @@ export default function TabSwitchFilter({ areas, bizTypes }: FilterProps) {
         {hasFilter && (
           <button
             type="button"
-            onClick={() => update({ area: "", bizType: "" })}
+            onClick={() => { update({ region: "", area: "", bizType: "" }); setShowSubAreas(false); }}
             className="ml-auto text-[11px] text-white/60 hover:text-yellow-400 transition-colors"
           >
             전체 해제
@@ -47,17 +52,51 @@ export default function TabSwitchFilter({ areas, bizTypes }: FilterProps) {
         )}
       </div>
 
-      {/* 칩 그리드 (선택된 탭만 렌더) */}
+      {/* 칩 그리드 */}
       {tab === "AREA" ? (
-        <ChipGrid>
-          <Chip selected={!area} onClick={() => update({ area: "" })}>전체</Chip>
-          {areas.map((a) => (
-            <Chip key={a.name} selected={area === a.name} onClick={() => update({ area: a.name })}>
-              {a.name}
-              <Count>{a.count}</Count>
+        showSubAreas && activeGroup ? (
+          <>
+            <div className="flex items-center gap-2 mb-1.5">
+              <button
+                type="button"
+                onClick={() => { setShowSubAreas(false); update({ region: "", area: "" }); }}
+                className="inline-flex items-center gap-1 text-[11px] text-yellow-400 hover:text-yellow-300 touch-manipulation"
+              >
+                <ArrowLeft size={11} /> 광역 다시 선택
+              </button>
+              <span className="text-[11px] text-white/50">/ {activeGroup.name} 세부</span>
+            </div>
+            <ChipGrid>
+              <Chip selected={!area} onClick={() => update({ area: "" })}>전체</Chip>
+              {activeGroup.areas.map((a) => (
+                <Chip
+                  key={a.name}
+                  selected={area === a.name}
+                  onClick={() => update({ region: activeGroup.code, area: a.name })}
+                >
+                  {a.name}
+                  <Count>{a.count}</Count>
+                </Chip>
+              ))}
+            </ChipGrid>
+          </>
+        ) : (
+          <ChipGrid>
+            <Chip selected={!region && !area} onClick={() => { update({ region: "", area: "" }); setShowSubAreas(false); }}>
+              전체
             </Chip>
-          ))}
-        </ChipGrid>
+            {regionGroups.map((g) => (
+              <Chip
+                key={g.code}
+                selected={region === g.code && !area}
+                onClick={() => { update({ region: g.code, area: "" }); setShowSubAreas(true); }}
+              >
+                {g.name}
+                <Count>{g.count}</Count>
+              </Chip>
+            ))}
+          </ChipGrid>
+        )
       ) : (
         <ChipGrid>
           <Chip selected={!bizType} onClick={() => update({ bizType: "" })}>전체</Chip>

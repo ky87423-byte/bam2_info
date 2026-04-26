@@ -286,9 +286,64 @@ export function getBizTypes(): { name: string; count: number }[] {
     .map(([name, count]) => ({ name, count }));
 }
 
-export function getShops(area: string, q: string, page: number, pageSize = PAGE_SIZE, bizType = "") {
+// ── 지역 계층화 (광역 → 세부) ────────────────────────────────────────────────
+// shops.json 의 category(광역 cat 코드)에 한글 라벨 매핑.
+// 소스 사이트 분류를 그대로 따르되 사용자 친화 라벨로 표시.
+const REGION_GROUP_LABELS: Record<string, string> = {
+  "1":   "강남권",
+  "10":  "서울",
+  "58":  "경기 남부",
+  "85":  "경기 북부",
+  "93":  "인천",
+  "110": "충청·강원",
+  "129": "대구",
+  "131": "구미",
+  "133": "전라·경상",
+  "155": "전국",
+  "218": "부산",
+};
+
+export interface RegionGroup {
+  code:  string;                                  // 광역 cat 코드
+  name:  string;                                  // 한글 라벨
+  count: number;                                  // 그룹 전체 업소 수
+  areas: { name: string; count: number }[];       // 세부 지역 (count desc)
+}
+
+export function getRegionGroups(): RegionGroup[] {
+  const shops = loadShops();
+  const map: Record<string, Record<string, number>> = {};
+  for (const s of shops) {
+    const cat = (s.category ?? "").trim();
+    if (!cat || !REGION_GROUP_LABELS[cat]) continue;
+    const area = (s.area ?? "").replace(/,+$/, "").trim();
+    if (!area) continue;
+    if (!map[cat]) map[cat] = {};
+    map[cat][area] = (map[cat][area] ?? 0) + 1;
+  }
+  return Object.keys(REGION_GROUP_LABELS)
+    .filter((code) => map[code])
+    .map((code) => {
+      const areas = Object.entries(map[code])
+        .sort((a, b) => b[1] - a[1])
+        .map(([name, count]) => ({ name, count }));
+      const total = areas.reduce((s, a) => s + a.count, 0);
+      return { code, name: REGION_GROUP_LABELS[code], count: total, areas };
+    })
+    .sort((a, b) => b.count - a.count);
+}
+
+export function getShops(
+  area: string,
+  q: string,
+  page: number,
+  pageSize = PAGE_SIZE,
+  bizType = "",
+  region = ""           // 광역 cat 코드 (그룹 필터, area 미선택 시에만 의미)
+) {
   let shops = loadShops();
   if (area)    shops = shops.filter((s) => s.area.includes(area));
+  else if (region) shops = shops.filter((s) => s.category === region);
   if (bizType) shops = shops.filter((s) => s.bizType === bizType);
   if (q) {
     const lq = q.toLowerCase();
