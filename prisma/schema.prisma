@@ -210,12 +210,13 @@ model Comment {
 // ── Message (1:1 쪽지 시스템) ───────────────────────────────────────────────
 
 model Message {
-  id         Int      @id @default(autoincrement())
-  content    String   @db.Text
-  senderId   Int
-  receiverId Int
-  isRead     Boolean  @default(false)
-  createdAt  DateTime @default(now())
+  id                   Int       @id @default(autoincrement())
+  content              String    @db.Text
+  senderId             Int
+  receiverId           Int
+  isRead               Boolean   @default(false)
+  adminAcknowledgedAt  DateTime?                       // admin 확인 시각 (null = 미확인 → /admin/messages 배지에 카운트)
+  createdAt            DateTime  @default(now())
 
   sender   User @relation("MessagesSent",     fields: [senderId],   references: [id], onDelete: Cascade)
   receiver User @relation("MessagesReceived", fields: [receiverId], references: [id], onDelete: Cascade)
@@ -224,6 +225,7 @@ model Message {
   @@index([receiverId, createdAt])      // 받은 쪽지함 최신순
   @@index([senderId,   createdAt])      // 보낸 쪽지함 최신순
   @@index([createdAt])                  // 관리자 전체 모니터링
+  @@index([adminAcknowledgedAt])        // admin 미확인 카운트
 }
 
 // ── AdminInquiry — 가상 업소 수신 쪽지 우회 저장소 ─────────────────────────

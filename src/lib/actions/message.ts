@@ -125,6 +125,18 @@ export async function deleteMessageAction(messageId: number): Promise<ActionResu
   return { ok: true };
 }
 
+// ── 관리자 확인 처리 (사이드바 배지 카운트에서 1 차감) ────────────────────
+export async function acknowledgeMessageAction(messageId: number): Promise<ActionResult> {
+  const session = await auth();
+  if (session?.user?.role !== "admin") return { ok: false, error: "권한이 없습니다." };
+  await prisma.message.updateMany({
+    where: { id: messageId, adminAcknowledgedAt: null },
+    data:  { adminAcknowledgedAt: new Date() },
+  });
+  revalidatePath("/admin/messages");
+  return { ok: true };
+}
+
 // ── 관리자 직접 쪽지 발송 ─────────────────────────────────────────────────
 // (sendMessageAction과 동일 로직 + admin 권한 체크 추가)
 export async function adminSendMessageAction(input: SendMessageInput): Promise<ActionResult<{ id: number }>> {

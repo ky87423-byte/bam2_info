@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 function playAlert(ctx: AudioContext) {
   const t = ctx.currentTime;
@@ -20,26 +20,57 @@ function playAlert(ctx: AudioContext) {
 
 interface Props {
   initialCount: number;
-  pollUrl: string;
+  pollUrl:      string;
+  /**
+   * localStorage 키. 설정 시 매 fetch 마다 ?since=<localStorage[key]> 자동 부착.
+   * 해당 키 갱신 이벤트('storage' / CustomEvent('admin-badge-refresh')) 감지 시 즉시 재조회.
+   * (예: 쪽지 — admin 이 /admin/messages 진입하면 키 갱신 → 배지 즉시 0 으로 사라짐)
+   */
+  sinceLocalStorageKey?: string;
 }
 
-export default function AdminPendingBadge({ initialCount, pollUrl }: Props) {
+export default function AdminPendingBadge({ initialCount, pollUrl, sinceLocalStorageKey }: Props) {
   const [count, setCount] = useState(initialCount);
   const audioCtxRef   = useRef<AudioContext | null>(null);
   const soundTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollTimerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const fetchCount = useCallback(async () => {
+    try {
+      let url = pollUrl;
+      if (sinceLocalStorageKey) {
+        const since = typeof window !== "undefined" ? window.localStorage.getItem(sinceLocalStorageKey) : null;
+        if (since) url += (url.includes("?") ? "&" : "?") + "since=" + encodeURIComponent(since);
+      }
+      const res  = await fetch(url, { cache: "no-store" });
+      const data = await res.json();
+      setCount(data.count ?? 0);
+    } catch { /* 무시 */ }
+  }, [pollUrl, sinceLocalStorageKey]);
+
   // 30초마다 폴링
   useEffect(() => {
-    pollTimerRef.current = setInterval(async () => {
-      try {
-        const res  = await fetch(pollUrl);
-        const data = await res.json();
-        setCount(data.count ?? 0);
-      } catch { /* 무시 */ }
-    }, 30_000);
+    pollTimerRef.current = setInterval(fetchCount, 30_000);
     return () => { if (pollTimerRef.current) clearInterval(pollTimerRef.current); };
-  }, [pollUrl]);
+  }, [fetchCount]);
+
+  // localStorage 키 갱신 이벤트 → 즉시 재조회 (cross-tab + same-tab)
+  useEffect(() => {
+    if (!sinceLocalStorageKey) return;
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === sinceLocalStorageKey) fetchCount();
+    };
+    const onCustom = (e: Event) => {
+      const detail = (e as CustomEvent<string>).detail;
+      if (!detail || detail === sinceLocalStorageKey) fetchCount();
+    };
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("admin-badge-refresh", onCustom as EventListener);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("admin-badge-refresh", onCustom as EventListener);
+    };
+  }, [sinceLocalStorageKey, fetchCount]);
 
   // count 변화 → 알림음 on/off
   useEffect(() => {

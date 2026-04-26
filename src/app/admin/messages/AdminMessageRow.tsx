@@ -1,8 +1,8 @@
 "use client";
 
-import { useTransition } from "react";
-import { Trash2, CheckCircle2, Circle, Shield, Store } from "lucide-react";
-import { deleteMessageAction } from "@/lib/actions/message";
+import { useEffect, useState, useTransition } from "react";
+import { Trash2, CheckCircle2, Circle, Shield, Store, Check } from "lucide-react";
+import { deleteMessageAction, acknowledgeMessageAction } from "@/lib/actions/message";
 
 interface UserBrief {
   id: number;
@@ -18,20 +18,51 @@ interface Props {
   receiver: UserBrief;
   content: string;
   isRead: boolean;
+  adminAcknowledgedAt: string | null;
 }
 
-export default function AdminMessageRow({ id, createdAt, sender, receiver, content, isRead }: Props) {
+export default function AdminMessageRow({ id, createdAt, sender, receiver, content, isRead, adminAcknowledgedAt }: Props) {
   const [pending, startTrans] = useTransition();
+  const [acked,   setAcked]   = useState<boolean>(adminAcknowledgedAt !== null);
+
+  // hydration mismatch 방지:
+  //   SSR/첫 렌더 = ISO substring (timezone 무관, 항상 동일 출력)
+  //   마운트 후    = ko-KR 로케일 포맷 (사용자 timezone 반영)
+  const [dateText, setDateText] = useState<string>(() =>
+    createdAt.slice(5, 16).replace("T", " ")  // "MM-DD HH:MM" (UTC, ISO 그대로)
+  );
+  useEffect(() => {
+    setDateText(
+      new Date(createdAt).toLocaleString("ko-KR", {
+        month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
+      })
+    );
+  }, [createdAt]);
 
   const handleDelete = () => {
     if (!confirm(`쪽지 #${id}를 영구 삭제하시겠습니까?`)) return;
     startTrans(async () => { await deleteMessageAction(id); });
   };
 
+  const handleAck = () => {
+    if (acked) return;
+    startTrans(async () => {
+      const res = await acknowledgeMessageAction(id);
+      if (res.ok) {
+        setAcked(true);
+        // 사이드바 배지 즉시 재조회 → 1 차감
+        window.dispatchEvent(new CustomEvent("admin-badge-refresh"));
+      }
+    });
+  };
+
   return (
-    <tr className={pending ? "opacity-40" : ""}>
+    <tr className={[
+      pending ? "opacity-40" : "",
+      !acked ? "bg-amber-50/40" : "",
+    ].join(" ")}>
       <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap tabular-nums">
-        {new Date(createdAt).toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}
+        {dateText}
       </td>
       <td className="px-4 py-2.5 text-xs">
         <UserCell user={sender} />
@@ -47,7 +78,22 @@ export default function AdminMessageRow({ id, createdAt, sender, receiver, conte
           ? <CheckCircle2 size={14} className="text-green-500 inline" />
           : <Circle       size={14} className="text-gray-300 inline" />}
       </td>
-      <td className="px-4 py-2.5 text-right">
+      <td className="px-4 py-2.5 text-right whitespace-nowrap">
+        <button
+          type="button"
+          onClick={handleAck}
+          disabled={pending || acked}
+          title={acked ? "이미 확인됨" : "확인 처리 (사이드바 배지 1 차감)"}
+          className={[
+            "inline-flex items-center gap-1 px-2 py-1 rounded text-xs mr-1 transition-colors",
+            acked
+              ? "text-gray-400 cursor-default"
+              : "text-blue-600 hover:bg-blue-50",
+          ].join(" ")}
+        >
+          <Check size={11} />
+          {acked ? "확인됨" : "확인"}
+        </button>
         <button
           type="button"
           onClick={handleDelete}

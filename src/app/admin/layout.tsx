@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { auth, signOut } from "@/auth";
 import { getShopPosts, getUsers, getShops } from "@/lib/data";
+import { prisma } from "@/lib/prisma";
 import {
   LayoutDashboard, Store, Users, Tag, MessageSquare, Mail, Inbox, ShieldCheck, RefreshCw,
   Ticket, BarChart2, Settings, LogOut, Coins, Calendar, FileText,
@@ -38,6 +39,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const { users: allUsers } = await getUsers("", 1, 9999);
   const memberPending = allUsers.filter((u) => u.role === "shop" && u.status === "blocked").length;
 
+  // 신착 카운트 — 쪽지(미확인) / 인콰이어리(NEW) / 클레임(PENDING)
+  const [messagesUnacked, inquiriesNew, claimsPending] = await Promise.all([
+    prisma.message.count({ where: { adminAcknowledgedAt: null } }),
+    prisma.adminInquiry.count({ where: { status: "NEW" } }),
+    prisma.claimRequest.count({ where: { status: "PENDING" } }),
+  ]);
+
   return (
     <div className="min-h-screen flex bg-gray-100">
       <aside className="w-56 shrink-0 bg-[#1a1a2e] text-white flex flex-col">
@@ -71,6 +79,30 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                 <AdminPendingBadge
                   initialCount={memberPending}
                   pollUrl="/api/admin/pending-count"
+                />
+              )}
+
+              {/* 쪽지 관리 — 미확인(adminAcknowledgedAt IS NULL) — 점멸 + 알림음 */}
+              {href === "/admin/messages" && (
+                <AdminPendingBadge
+                  initialCount={messagesUnacked}
+                  pollUrl="/api/admin/messages-new-count"
+                />
+              )}
+
+              {/* 업소 문의함 — NEW(미확인) — 점멸 + 알림음 */}
+              {href === "/admin/inquiries" && (
+                <AdminPendingBadge
+                  initialCount={inquiriesNew}
+                  pollUrl="/api/admin/inquiries-new-count"
+                />
+              )}
+
+              {/* 소유권 신청 — PENDING(검토 대기) — 점멸 + 알림음 */}
+              {href === "/admin/claims" && (
+                <AdminPendingBadge
+                  initialCount={claimsPending}
+                  pollUrl="/api/admin/claims-pending-count"
                 />
               )}
             </Link>

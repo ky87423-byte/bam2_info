@@ -122,6 +122,7 @@ export default async function AdminMessagesPage({ searchParams }: Props) {
                     receiver={{ ...m.receiver, role: String(m.receiver.role).toLowerCase() }}
                     content={m.content}
                     isRead={m.isRead}
+                    adminAcknowledgedAt={m.adminAcknowledgedAt ? m.adminAcknowledgedAt.toISOString() : null}
                   />
                 ))
               )}
