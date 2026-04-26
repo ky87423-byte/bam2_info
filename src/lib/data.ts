@@ -26,8 +26,9 @@ export interface ShopData {
   subject: string;
   content: string;
   area: string;
-  category: string;
-  category2: string;
+  bizType: string;       // 실제 업종 (건마/오피/술집/...)
+  category: string;      // [legacy] 광역 지역 코드
+  category2: string;     // [legacy] 세부 지역 코드
   phone: string;
   hphone: string;
   telegram: string;
@@ -202,7 +203,8 @@ function loadRaw() {
   try {
     return JSON.parse(fs.readFileSync(SHOPS_PATH, "utf-8")) as Array<{
       company: string; subject: string; content: string; area: string;
-      category?: string; category2?: string; phone: string; hphone: string;
+      bizType?: string; category?: string; category2?: string;
+      phone: string; hphone: string;
       telegram: string; hit: number; price: number; mainPhoto: string;
       photos: string; time1: string; time2: string; timeFull: number; scrapedAt: string;
     }>;
@@ -225,7 +227,8 @@ function loadShops(): ShopData[] {
         subject:   ov.subject   ?? s.subject ?? "",
         content:   ov.content   ?? s.content ?? "",
         area:      ov.area      ?? s.area ?? "",
-        category:  ov.category  ?? s.category ?? "",
+        bizType:   ov.bizType   ?? s.bizType   ?? "",
+        category:  ov.category  ?? s.category  ?? "",
         category2: ov.category2 ?? s.category2 ?? "",
         phone:     ov.phone     ?? s.phone ?? "",
         hphone:    ov.hphone    ?? s.hphone ?? "",
@@ -270,22 +273,23 @@ export function getAreasWithCounts(): { name: string; count: number }[] {
     .map(([name, count]) => ({ name, count }));
 }
 
-export function getCategories(): { code: string; count: number }[] {
+// 실제 업종 (건마/오피/술집...) 목록 — bizType 기준
+export function getBizTypes(): { name: string; count: number }[] {
   const shops = loadShops();
   const counts: Record<string, number> = {};
   for (const s of shops) {
-    const c = (s.category ?? "").trim();
-    if (c) counts[c] = (counts[c] ?? 0) + 1;
+    const b = (s.bizType ?? "").trim();
+    if (b) counts[b] = (counts[b] ?? 0) + 1;
   }
   return Object.entries(counts)
     .sort((a, b) => b[1] - a[1])
-    .map(([code, count]) => ({ code, count }));
+    .map(([name, count]) => ({ name, count }));
 }
 
-export function getShops(area: string, q: string, page: number, pageSize = PAGE_SIZE, category = "") {
+export function getShops(area: string, q: string, page: number, pageSize = PAGE_SIZE, bizType = "") {
   let shops = loadShops();
-  if (area)     shops = shops.filter((s) => s.area.includes(area));
-  if (category) shops = shops.filter((s) => s.category === category);
+  if (area)    shops = shops.filter((s) => s.area.includes(area));
+  if (bizType) shops = shops.filter((s) => s.bizType === bizType);
   if (q) {
     const lq = q.toLowerCase();
     shops = shops.filter((s) =>

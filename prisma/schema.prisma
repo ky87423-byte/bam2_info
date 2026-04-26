@@ -72,8 +72,9 @@ model Shop {
   subject       String   @db.Text
   content       String   @db.Text
   area          String
-  category      String   @default("")
-  category2     String   @default("")
+  bizType       String   @default("")   // 실제 업종 (건마/오피/술집/휴게텔/안마/...)
+  category      String   @default("")   // [legacy] 광역 지역 코드 (소스 사이트 cat)
+  category2     String   @default("")   // [legacy] 세부 지역 코드 (소스 사이트 cat2)
   phone         String   @default("")
   hphone        String   @default("")
   telegram      String   @default("")

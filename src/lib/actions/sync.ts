@@ -16,8 +16,9 @@ interface ScrapedRow {
   subject:     string;
   content:     string;
   area:        string;
-  category:    string;
-  category2:   string;
+  bizType?:    string;     // 실제 업종 (건마/오피/술집...)  — 백필 후 신규 필드
+  category:    string;     // [legacy] 광역 지역 코드
+  category2:   string;     // [legacy] 세부 지역 코드
   phone:       string;
   hphone:      string;
   telegram:    string;
@@ -77,6 +78,7 @@ export async function syncShopsFromJsonAction(): Promise<SyncActionResult> {
         subject:   row.subject ?? "",
         content:   row.content ?? "",
         area:      row.area ?? "",
+        bizType:   row.bizType ?? "",
         category:  row.category ?? "",
         category2: row.category2 ?? "",
         phone:     row.phone ?? "",

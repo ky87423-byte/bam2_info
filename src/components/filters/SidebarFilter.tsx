@@ -9,9 +9,9 @@ import { useFilterParams, type FilterProps } from "./filterUtils";
  * 데스크탑(lg↑): aside 사이드바 / 모바일: 상단 펼침 영역.
  * (페이지 구조 변경: page.tsx 의 SIDEBAR 분기에서 다른 그리드 컨테이너 사용)
  */
-export default function SidebarFilter({ areas, categories }: FilterProps) {
-  const { area, category, update } = useFilterParams();
-  const hasFilter = !!area || !!category;
+export default function SidebarFilter({ areas, bizTypes }: FilterProps) {
+  const { area, bizType, update } = useFilterParams();
+  const hasFilter = !!area || !!bizType;
 
   return (
     <div className="bg-white/5 rounded-2xl ring-1 ring-white/10 p-4 lg:sticky lg:top-20">
@@ -20,7 +20,7 @@ export default function SidebarFilter({ areas, categories }: FilterProps) {
         {hasFilter && (
           <button
             type="button"
-            onClick={() => update({ area: "", category: "" })}
+            onClick={() => update({ area: "", bizType: "" })}
             className="inline-flex items-center gap-0.5 text-[10px] text-white/60 hover:text-yellow-400 transition-colors"
           >
             <X size={10} /> 초기화
@@ -43,15 +43,15 @@ export default function SidebarFilter({ areas, categories }: FilterProps) {
       </Section>
 
       <Section icon={Tag} label="업종">
-        <Item selected={!category} onClick={() => update({ category: "" })} count={null}>전체</Item>
-        {categories.map((c) => (
+        <Item selected={!bizType} onClick={() => update({ bizType: "" })} count={null}>전체</Item>
+        {bizTypes.map((b) => (
           <Item
-            key={c.code}
-            selected={category === c.code}
-            onClick={() => update({ category: c.code })}
-            count={c.count}
+            key={b.name}
+            selected={bizType === b.name}
+            onClick={() => update({ bizType: b.name })}
+            count={b.count}
           >
-            #{c.code}
+            {b.name}
           </Item>
         ))}
       </Section>

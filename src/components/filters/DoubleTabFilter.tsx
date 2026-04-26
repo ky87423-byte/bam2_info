@@ -8,8 +8,8 @@ import { useFilterParams, type FilterProps } from "./filterUtils";
  * 지역 칩 한 줄 + 업종 칩 한 줄. 가장 직관적·기본형.
  * 모바일: 가로 스크롤 + 44px+ 터치 타겟.
  */
-export default function DoubleTabFilter({ areas, categories }: FilterProps) {
-  const { area, category, update } = useFilterParams();
+export default function DoubleTabFilter({ areas, bizTypes }: FilterProps) {
+  const { area, bizType, update } = useFilterParams();
 
   return (
     <div className="space-y-3">
@@ -24,11 +24,11 @@ export default function DoubleTabFilter({ areas, categories }: FilterProps) {
       </Row>
 
       <Row icon={Tag} label="업종">
-        <Chip selected={!category} onClick={() => update({ category: "" })}>전체</Chip>
-        {categories.map((c) => (
-          <Chip key={c.code} selected={category === c.code} onClick={() => update({ category: c.code })}>
-            #{c.code}
-            <CountBadge>{c.count}</CountBadge>
+        <Chip selected={!bizType} onClick={() => update({ bizType: "" })}>전체</Chip>
+        {bizTypes.map((b) => (
+          <Chip key={b.name} selected={bizType === b.name} onClick={() => update({ bizType: b.name })}>
+            {b.name}
+            <CountBadge>{b.count}</CountBadge>
           </Chip>
         ))}
       </Row>

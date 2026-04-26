@@ -7,8 +7,8 @@ import { useFilterParams, type FilterProps } from "./filterUtils";
  * Type B — 드롭다운
  * 셀렉트 박스 2개. 데스크탑 친화·정보량 적은 인터페이스.
  */
-export default function DropdownFilter({ areas, categories }: FilterProps) {
-  const { area, category, update } = useFilterParams();
+export default function DropdownFilter({ areas, bizTypes }: FilterProps) {
+  const { area, bizType, update } = useFilterParams();
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
@@ -27,19 +27,19 @@ export default function DropdownFilter({ areas, categories }: FilterProps) {
       <Select
         icon={Tag}
         label="업종"
-        value={category}
-        onChange={(v) => update({ category: v })}
+        value={bizType}
+        onChange={(v) => update({ bizType: v })}
       >
         <option value="">전체 업종</option>
-        {categories.map((c) => (
-          <option key={c.code} value={c.code}>#{c.code} ({c.count})</option>
+        {bizTypes.map((b) => (
+          <option key={b.name} value={b.name}>{b.name} ({b.count})</option>
         ))}
       </Select>
 
-      {(area || category) && (
+      {(area || bizType) && (
         <button
           type="button"
-          onClick={() => update({ area: "", category: "" })}
+          onClick={() => update({ area: "", bizType: "" })}
           className="inline-flex items-center gap-1 h-11 px-3 rounded-xl text-xs text-yellow-400 hover:bg-white/10 transition-colors touch-manipulation"
         >
           <X size={12} />

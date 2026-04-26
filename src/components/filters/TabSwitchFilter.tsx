@@ -4,25 +4,25 @@ import { useState } from "react";
 import { MapPin, Tag, X } from "lucide-react";
 import { useFilterParams, type FilterProps } from "./filterUtils";
 
-type Tab = "AREA" | "CATEGORY";
+type Tab = "AREA" | "BIZ";
 
 /**
  * Type D — 탭 스위칭
  * 상단 [업종 / 지역] 토글 버튼 → 선택된 탭의 칩 그리드만 표시.
- * 활성 필터(area·category)는 토글 위에 작게 노출 (현재 선택 시각화).
+ * 활성 필터(area·bizType)는 토글 위에 작게 노출 (현재 선택 시각화).
  */
-export default function TabSwitchFilter({ areas, categories }: FilterProps) {
-  const { area, category, update } = useFilterParams();
-  const [tab, setTab] = useState<Tab>(category ? "CATEGORY" : "AREA");
-  const hasFilter = !!area || !!category;
+export default function TabSwitchFilter({ areas, bizTypes }: FilterProps) {
+  const { area, bizType, update } = useFilterParams();
+  const [tab, setTab] = useState<Tab>(bizType ? "BIZ" : "AREA");
+  const hasFilter = !!area || !!bizType;
 
   return (
     <div className="space-y-3">
       {/* 탭 토글 */}
       <div className="flex items-center gap-2">
         <div className="inline-flex bg-white/10 rounded-xl p-1">
-          <TabButton active={tab === "AREA"}     onClick={() => setTab("AREA")}     icon={MapPin} label="지역" />
-          <TabButton active={tab === "CATEGORY"} onClick={() => setTab("CATEGORY")} icon={Tag}    label="업종" />
+          <TabButton active={tab === "AREA"} onClick={() => setTab("AREA")} icon={MapPin} label="지역" />
+          <TabButton active={tab === "BIZ"}  onClick={() => setTab("BIZ")}  icon={Tag}    label="업종" />
         </div>
 
         {/* 현재 선택 칩들 (없으면 안 보임) */}
@@ -31,15 +31,15 @@ export default function TabSwitchFilter({ areas, categories }: FilterProps) {
             <MapPin size={10} /> {area}
           </ActiveChip>
         )}
-        {category && (
-          <ActiveChip onRemove={() => update({ category: "" })}>
-            <Tag size={10} /> #{category}
+        {bizType && (
+          <ActiveChip onRemove={() => update({ bizType: "" })}>
+            <Tag size={10} /> {bizType}
           </ActiveChip>
         )}
         {hasFilter && (
           <button
             type="button"
-            onClick={() => update({ area: "", category: "" })}
+            onClick={() => update({ area: "", bizType: "" })}
             className="ml-auto text-[11px] text-white/60 hover:text-yellow-400 transition-colors"
           >
             전체 해제
@@ -60,11 +60,11 @@ export default function TabSwitchFilter({ areas, categories }: FilterProps) {
         </ChipGrid>
       ) : (
         <ChipGrid>
-          <Chip selected={!category} onClick={() => update({ category: "" })}>전체</Chip>
-          {categories.map((c) => (
-            <Chip key={c.code} selected={category === c.code} onClick={() => update({ category: c.code })}>
-              #{c.code}
-              <Count>{c.count}</Count>
+          <Chip selected={!bizType} onClick={() => update({ bizType: "" })}>전체</Chip>
+          {bizTypes.map((b) => (
+            <Chip key={b.name} selected={bizType === b.name} onClick={() => update({ bizType: b.name })}>
+              {b.name}
+              <Count>{b.count}</Count>
             </Chip>
           ))}
         </ChipGrid>
