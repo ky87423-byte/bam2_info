@@ -7,7 +7,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { ensureVirtualUserForShop } from "@/lib/virtualUsers";
 
-const SHOPS_PATH = path.join(process.cwd(), "..", "bam_info", "scraped_data", "shops.json");
+const SHOPS_PATH = path.join(process.cwd(), "scraper", "scraped_data", "shops.json");
 
 // shops.json 의 row 구조 (스크래퍼 출력)
 interface ScrapedRow {

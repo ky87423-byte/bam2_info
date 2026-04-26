@@ -47,3 +47,12 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+# scraper (bam2_info/scraper/)
+/scraper/node_modules/
+/scraper/scraped_data/*.log
+/scraper/scraped_data/shops.json.bak.*
+
+# 스크래퍼가 다운로드하는 이미지 (84GB 규모 — git 추적 부적합)
+# 빌드 환경에서는 별도 백업/동기화 필요 (예: rsync, S3)
+/public/images/imgs/

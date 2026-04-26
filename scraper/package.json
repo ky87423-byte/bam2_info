@@ -1,0 +1,21 @@
+{
+  "name": "bam2-scraper",
+  "private": true,
+  "description": "opga037 업소 스크래퍼 — 웹사이트와 동일 repo 내 격리된 의존성. ../public/images/imgs 에 이미지, ./scraped_data/shops.json 에 데이터 저장",
+  "scripts": {
+    "scrape":   "node scraper.js",
+    "retry-images": "node retry-images.js",
+    "retry-errors": "node retry-errors.js",
+    "backfill": "node backfill-biztype.js"
+  },
+  "dependencies": {
+    "axios": "^1.15.2",
+    "axios-cookiejar-support": "^6.0.5",
+    "cheerio": "^1.2.0",
+    "crypto-js": "^4.2.0",
+    "dotenv": "^17.2.3",
+    "mysql2": "^3.22.2",
+    "puppeteer": "^24.42.0",
+    "tough-cookie": "^6.0.1"
+  }
+}

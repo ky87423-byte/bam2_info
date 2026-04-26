@@ -9,7 +9,7 @@ import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const SHOPS_PATH = path.join(__dirname, "..", "..", "bam_info", "scraped_data", "shops.json");
+const SHOPS_PATH = path.join(__dirname, "..", "scraper", "scraped_data", "shops.json");
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),

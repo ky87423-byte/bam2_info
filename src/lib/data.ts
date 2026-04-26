@@ -3,7 +3,7 @@ import path from "path";
 import { prisma } from "./prisma";
 import { UserRole, UserStatus, PointAction as DbPointAction } from "@/generated/prisma/enums";
 
-const SHOPS_PATH       = path.join(process.cwd(), "..", "bam_info", "scraped_data", "shops.json");
+const SHOPS_PATH       = path.join(process.cwd(), "scraper", "scraped_data", "shops.json");
 const OVERRIDE_PATH    = path.join(process.cwd(), "data", "shop_overrides.json");
 // USERS_PATH, POINT_LOGS_PATH 제거 — User/PointLog는 Prisma DB로 이관됨
 const SETTINGS_PATH    = path.join(process.cwd(), "data", "settings.json");

@@ -11,7 +11,7 @@ import path from "path";
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
 
-const SHOPS_JSON = path.join(__dirname, "../../bam_info/scraped_data/shops.json");
+const SHOPS_JSON = path.join(__dirname, "../scraper/scraped_data/shops.json");
 
 interface ScrapedShop {
   company: string;
