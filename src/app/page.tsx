@@ -6,6 +6,7 @@ import ShopBoardTable from "@/components/ShopBoardRow";
 import Pagination from "@/components/Pagination";
 import { getRegionGroups, getBizTypes, getShops } from "@/lib/data";
 import { getSiteConfig } from "@/lib/siteConfig";
+import RankingWidget from "@/components/RankingWidget";
 
 // ── 필터 컴포넌트 — dynamic import (활성 레이아웃 chunk 만 다운로드) ─────
 const FILTER_COMPONENTS = {
@@ -75,6 +76,12 @@ export default async function HomePage({ searchParams }: Props) {
     </Suspense>
   );
 
+  const rankingWidget = (
+    <Suspense fallback={<div className="h-40 bg-[#1a1a2e] rounded-2xl animate-pulse" />}>
+      <RankingWidget />
+    </Suspense>
+  );
+
   // ── filterLayout=SIDEBAR: 좌측 사이드바 + 우측 본문 (헤더와 일체화) ──────
   //   모바일: SidebarFilter 자체 다크 토글 버튼이 헤더에 바로 붙음 (pt-0)
   //   데스크톱: 좌측 사이드바 다크 → 헤더와 같은 색이라 일체감, 본문만 위쪽 padding
@@ -82,10 +89,11 @@ export default async function HomePage({ searchParams }: Props) {
     return (
       <div className="max-w-7xl mx-auto px-4 pb-6">
         <div className="lg:grid lg:grid-cols-[240px_1fr] lg:gap-6">
-          <aside className="mb-4 lg:mb-0">
+          <aside className="mb-4 lg:mb-0 space-y-4">
             <Suspense fallback={<div className="h-40" />}>
               <FilterComp regionGroups={regionGroups} bizTypes={bizTypes} />
             </Suspense>
+            {rankingWidget}
           </aside>
           <main className="min-w-0 pt-6">
             {resultHeader}
@@ -99,6 +107,7 @@ export default async function HomePage({ searchParams }: Props) {
 
   // ── 그 외 (DOUBLE_TAB / DROPDOWN / TAB_SWITCH): 헤더와 일체화된 풀폭 다크 띠 ─
   //   풀폭 wrapper 라 좌우 흰 띠 0, shadow-lg 로 본문과 입체감 분리
+  //   본문은 lg↑ 에서 좌측 결과 + 우측 명예의 전당 위젯 2 컬럼
   return (
     <>
       <div className="bg-[#1a1a2e] text-white shadow-lg">
@@ -108,10 +117,15 @@ export default async function HomePage({ searchParams }: Props) {
           </Suspense>
         </div>
       </div>
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        {resultHeader}
-        {shopsGrid}
-        {pagination}
+      <div className="max-w-7xl mx-auto px-4 py-6 lg:grid lg:grid-cols-[1fr_280px] lg:gap-6">
+        <main className="min-w-0">
+          {resultHeader}
+          {shopsGrid}
+          {pagination}
+        </main>
+        <aside className="mt-6 lg:mt-0">
+          {rankingWidget}
+        </aside>
       </div>
     </>
   );

@@ -64,6 +64,17 @@ enum FilterLayout {
   TAB_SWITCH    // D: [업종/지역] 토글 → 하단 칩 그리드 교체
 }
 
+enum RankingPeriodType {
+  WEEKLY        // 주간 (월요일 0시 ~ 일요일 23:59)
+  MONTHLY       // 월간 (해당 월 1일 0시 ~ 말일 23:59)
+  CUSTOM        // 관리자가 직접 지정한 날짜 ~ 날짜
+}
+
+enum RankingMode {
+  BALANCE       // 보유 포인트 잔액 기준
+  PERIOD        // 기간 내 누적(+) 기준
+}
+
 // ── Models ────────────────────────────────────────────────────────────────────
 
 model Shop {
@@ -152,6 +163,8 @@ model User {
 
   isVirtual      Boolean    @default(false)   // 스크랩 업소를 위한 자동 생성 가상 계정
                                                 // (passwordHash="", isVirtual=true → 로그인 불가)
+  title          String?    @db.VarChar(80)   // 칭호 (예: "🥇 2026-04 월간 1위") — 닉네임 옆 노출
+  titleAwardedAt DateTime?                     // 칭호 부여 시각 (해당 정산 시각)
 
   pointLogs        PointLog[]
   comments         Comment[]
@@ -161,6 +174,7 @@ model User {
   inquiriesSent    AdminInquiry[] @relation("InquirySender")
   claimsRequested  ClaimRequest[] @relation("ClaimRequester")
   boardPosts       BoardPost[]    @relation("BoardPostAuthor")
+  rankingRewards   RankingReward[]
 
   @@index([status])
   @@index([role])
@@ -273,11 +287,12 @@ model ClaimRequest {
 // ── SiteConfig — 사이트 전역 토글 (singleton, id=1 고정) ────────────────────
 
 model SiteConfig {
-  id                     Int          @id @default(1)        // 항상 1
-  isShopCommunityActive  Boolean      @default(false)        // 업소 전용 비밀 게시판 ON/OFF
-  mainLayout             MainLayout   @default(GRID)         // 메인 페이지 레이아웃 종류
-  filterLayout           FilterLayout @default(DOUBLE_TAB)   // 메인 필터 영역 UI 종류
-  updatedAt              DateTime     @updatedAt
+  id                        Int          @id @default(1)        // 항상 1
+  isShopCommunityActive     Boolean      @default(false)        // 업소 전용 비밀 게시판 ON/OFF
+  mainLayout                MainLayout   @default(GRID)         // 메인 페이지 레이아웃 종류
+  filterLayout              FilterLayout @default(DOUBLE_TAB)   // 메인 필터 영역 UI 종류
+  rankingExcludedUsernames  String[]     @default([])           // 랭킹 제외 username 리스트 (테스트/운영 계정)
+  updatedAt                 DateTime     @updatedAt
 }
 
 // ── BoardPost — 일반 게시판 (category 로 다중 게시판 분기, polymorphic) ────
@@ -301,4 +316,36 @@ model BoardPost {
   @@index([category, createdAt])     // 게시판별 최신순 (핵심)
   @@index([authorId, createdAt])     // 작성자별
   @@index([category, isVisible, deletedAt])
+}
+
+// ── RankingReward — 랭킹 정산 보상 이력 ────────────────────────────────────
+//   주간/월간 정산 시점에 1-3위 각각 1행 생성. 보너스 포인트 + 칭호 + DM 발송 + 경품 발송 추적.
+//   periodKey 예: "2026-04-monthly" / "2026-W17-weekly"
+model RankingReward {
+  id            Int                @id @default(autoincrement())
+  periodKey     String             @db.VarChar(32)
+  periodType    RankingPeriodType
+  mode          RankingMode
+  startDate     DateTime
+  endDate       DateTime
+  rank          Int                                                // 1~3
+  userId        Int
+  username      String                                             // 시점 username 보존
+  nickname      String                                             // 시점 nickname 보존
+  points        Int                                                // 정산 시점 카운트값
+  bonusPoints   Int                                                // 지급된 보너스 (예: 50000)
+  title         String             @db.VarChar(80)                  // 부여된 칭호
+  prizeShipped  Boolean            @default(false)                  // 경품 발송 여부
+  prizeMemo     String             @default("")                     // 경품/메모
+  shippedAt     DateTime?                                           // 발송 처리 시각
+  shippedBy     Int?                                                // 발송 처리한 admin userId
+  notifiedAt    DateTime?                                           // 자동 쪽지 발송 시각
+  createdAt     DateTime           @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([periodKey, rank])         // 같은 기간/같은 등수 중복 정산 방지
+  @@index([userId, createdAt])        // 특정 유저의 보상 이력
+  @@index([prizeShipped])             // 미발송 경품 큐
+  @@index([periodType, createdAt])    // 주간/월간 별 최신
 }

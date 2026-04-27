@@ -4,7 +4,7 @@ import { getShopPosts } from "@/lib/data";
 import { prisma } from "@/lib/prisma";
 import {
   LayoutDashboard, Store, Users, Tag, MessageSquare, Mail, Inbox, ShieldCheck, RefreshCw,
-  Ticket, BarChart2, Settings, LogOut, Coins, Calendar, FileText,
+  Ticket, BarChart2, Settings, LogOut, Coins, Calendar, FileText, Trophy,
 } from "lucide-react";
 import AdminPendingBadge from "./AdminPendingBadge";
 import AdminSidebarShell from "./AdminSidebarShell";
@@ -15,6 +15,7 @@ const navItems = [
   { href: "/admin/shop-posts", label: "업소 게시글",   icon: FileText        },
   { href: "/admin/users",      label: "회원 관리",     icon: Users           },
   { href: "/admin/points",     label: "포인트 관리",   icon: Coins           },
+  { href: "/admin/rankings",   label: "포인트 랭킹",   icon: Trophy          },
   { href: "/admin/categories", label: "카테고리 관리", icon: Tag             },
   { href: "/admin/boards",     label: "게시판 관리",   icon: MessageSquare   },
   { href: "/admin/coupons",    label: "쿠폰 / 이벤트", icon: Ticket         },

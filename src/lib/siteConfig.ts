@@ -14,6 +14,7 @@ export interface SiteConfigData {
   isShopCommunityActive: boolean;
   mainLayout:   MainLayoutValue;
   filterLayout: FilterLayoutValue;
+  rankingExcludedUsernames: string[];
   updatedAt: Date;
 }
 
@@ -22,6 +23,7 @@ const DEFAULT: SiteConfigData = {
   isShopCommunityActive: false,
   mainLayout:   "GRID",
   filterLayout: "DOUBLE_TAB",
+  rankingExcludedUsernames: [],
   updatedAt: new Date(0),
 };
 
@@ -41,6 +43,7 @@ export async function getSiteConfig(): Promise<SiteConfigData> {
           isShopCommunityActive: row.isShopCommunityActive,
           mainLayout:   String(row.mainLayout)   as MainLayoutValue,
           filterLayout: String(row.filterLayout) as FilterLayoutValue,
+          rankingExcludedUsernames: row.rankingExcludedUsernames ?? [],
           updatedAt: row.updatedAt,
         }
       : DEFAULT;
@@ -57,6 +60,7 @@ export async function updateSiteConfig(data: Partial<Omit<SiteConfigData, "id" |
   if (data.isShopCommunityActive !== undefined) updateData.isShopCommunityActive = data.isShopCommunityActive;
   if (data.mainLayout   !== undefined)          updateData.mainLayout            = data.mainLayout   as MainLayout;
   if (data.filterLayout !== undefined)          updateData.filterLayout          = data.filterLayout as FilterLayout;
+  if (data.rankingExcludedUsernames !== undefined) updateData.rankingExcludedUsernames = data.rankingExcludedUsernames;
 
   await prisma.siteConfig.upsert({
     where:  { id: 1 },
@@ -66,6 +70,7 @@ export async function updateSiteConfig(data: Partial<Omit<SiteConfigData, "id" |
       isShopCommunityActive: data.isShopCommunityActive ?? false,
       mainLayout:   (data.mainLayout   ?? "GRID")       as MainLayout,
       filterLayout: (data.filterLayout ?? "DOUBLE_TAB") as FilterLayout,
+      rankingExcludedUsernames: data.rankingExcludedUsernames ?? [],
     },
   });
   _cache = null;        // 즉시 invalidate — 다음 호출이 fresh DB read
