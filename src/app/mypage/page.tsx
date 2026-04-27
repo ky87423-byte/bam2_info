@@ -1,8 +1,8 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
-import { getUserById, getPointLogs, getTodayAttendance, getUserCoupons } from "@/lib/data";
+import { getUserById, getPointLogs, getTodayAttendance, getUserCoupons, couponLabel } from "@/lib/data";
 import { Coins, Flame, Calendar, TrendingUp, TrendingDown, Tag, Store, Clock } from "lucide-react";
-import MyCouponUsedButton from "./MyCouponUsedButton";
+import MyCouponCode from "./MyCouponCode";
 
 const ACTION_LABELS: Record<string, string> = {
   signup: "회원가입",
@@ -104,7 +104,7 @@ export default async function MyPage() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-800 truncate">{uc.coupon.title}</p>
                   <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5">
-                    <span className="font-semibold text-green-600">{uc.coupon.discount}</span>
+                    <span className="font-semibold text-green-600">{couponLabel(uc.coupon)}</span>
                     {uc.coupon.shopName && (
                       <span className="flex items-center gap-0.5"><Store size={10} />{uc.coupon.shopName}</span>
                     )}
@@ -116,13 +116,18 @@ export default async function MyPage() {
                 <div className="shrink-0 text-right">
                   {uc.usedAt ? (
                     <span className="text-xs text-gray-400">사용완료<br />{uc.usedAt}</span>
+                  ) : uc.reservationCode ? (
+                    <MyCouponCode code={uc.reservationCode} />
                   ) : (
-                    <MyCouponUsedButton userCouponId={uc.id} />
+                    <span className="text-xs text-gray-400">코드 없음</span>
                   )}
                 </div>
               </div>
             ))}
           </div>
+          <p className="text-[11px] text-gray-400 mt-3">
+            * 쿠폰 사용은 업소에서 [사용 확인] 처리해야 완료됩니다. 매장에 위 예약 코드 또는 닉네임을 보여주세요.
+          </p>
         </div>
       )}
 

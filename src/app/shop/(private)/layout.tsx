@@ -1,14 +1,16 @@
 import Link from "next/link";
 import { auth, signOut } from "@/auth";
 import {
-  LayoutDashboard, FileText, PlusCircle,
+  LayoutDashboard, FileText, PlusCircle, Tag, ScanLine,
   Home, Shield, LogOut,
 } from "lucide-react";
 
 const navItems = [
-  { href: "/shop/dashboard", label: "대시보드",       icon: LayoutDashboard },
-  { href: "/shop/dashboard", label: "내 업소 게시글",  icon: FileText        },
-  { href: "/shop/post/new",  label: "새 게시글 작성",  icon: PlusCircle      },
+  { href: "/shop/dashboard",       label: "대시보드",       icon: LayoutDashboard },
+  { href: "/shop/dashboard",       label: "내 업소 게시글",  icon: FileText        },
+  { href: "/shop/post/new",        label: "새 게시글 작성",  icon: PlusCircle      },
+  { href: "/shop/coupons",         label: "내 쿠폰 관리",    icon: Tag             },
+  { href: "/shop/coupons/verify",  label: "쿠폰 사용 확인",  icon: ScanLine        },
 ];
 
 export default async function ShopLayout({ children }: { children: React.ReactNode }) {

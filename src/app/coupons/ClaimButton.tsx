@@ -14,6 +14,7 @@ export default function ClaimButton({ couponId, claimed: initialClaimed, loggedI
   const [pending, startTransition] = useTransition();
   const [claimed, setClaimed] = useState(initialClaimed);
   const [error, setError] = useState("");
+  const [code, setCode]     = useState<string | null>(null);
 
   if (!loggedIn) {
     return (
@@ -27,10 +28,15 @@ export default function ClaimButton({ couponId, claimed: initialClaimed, loggedI
 
   if (claimed) {
     return (
-      <span className="inline-flex items-center gap-1.5 px-4 py-2 bg-green-50 text-green-600 rounded-lg text-sm font-medium">
-        <Gift size={14} />
-        받기 완료
-      </span>
+      <div className="flex flex-col items-end gap-1">
+        <span className="inline-flex items-center gap-1.5 px-4 py-2 bg-green-50 text-green-600 rounded-lg text-sm font-medium">
+          <Gift size={14} />
+          받기 완료
+        </span>
+        {code && (
+          <p className="text-[11px] text-gray-500 font-mono">예약 코드: <span className="text-emerald-600">{code}</span></p>
+        )}
+      </div>
     );
   }
 
@@ -38,8 +44,12 @@ export default function ClaimButton({ couponId, claimed: initialClaimed, loggedI
     setError("");
     startTransition(async () => {
       const result = await actionClaimCoupon(couponId);
-      if (result.error) setError(result.error);
-      else setClaimed(true);
+      if (result.error) {
+        setError(result.error);
+      } else {
+        setClaimed(true);
+        if (result.reservationCode) setCode(result.reservationCode);
+      }
     });
   };
 

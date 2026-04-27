@@ -89,12 +89,16 @@ export interface AttendanceRecord {
   createdAt: string;
 }
 
+export type CouponType = "ORIGINAL_PRICE" | "FREE" | "DISCOUNT";
+
 export interface CouponData {
   id: number;
   type: "coupon" | "event";
   title: string;
-  description: string;
-  discount: string;
+  description: string;       // 게시판 본문 — whitespace-pre-wrap 으로 표시
+  discount: string;          // 표시용 라벨 (couponType + discountAmount 로부터 파생, 레거시 free-form 도 그대로 보존)
+  couponType?: CouponType;   // 신규: 3종 타입
+  discountAmount?: number;   // DISCOUNT 일 때 할인액(원). 1,000 ~ 1,000,000
   shopId: number | null;
   shopName: string;
   validUntil: string;
@@ -102,6 +106,11 @@ export interface CouponData {
   createdAt: string;
   maxIssue?: number;
   ownerUserId?: number | null;
+  // ── 게시판 필드 ──
+  area?: string;             // 지역 (예: "서울", "강남")
+  bizType?: string;          // 업종 (예: "건마", "오피")
+  photos?: string[];          // 본문 사진 URL 배열
+  mainPhoto?: string;        // 대표 사진
 }
 
 export interface UserCoupon {
@@ -111,6 +120,28 @@ export interface UserCoupon {
   couponId: number;
   claimedAt: string;
   usedAt?: string;
+  reservationCode?: string;  // 8자 영숫자, 업소 측 [사용 확인] 시 본인 식별용
+}
+
+export const COUPON_AMOUNT_MIN = 1_000;
+export const COUPON_AMOUNT_MAX = 1_000_000;
+
+export function couponLabel(c: Pick<CouponData, "couponType" | "discountAmount" | "discount">): string {
+  if (c.couponType === "ORIGINAL_PRICE") return "원가권";
+  if (c.couponType === "FREE")           return "무료권";
+  if (c.couponType === "DISCOUNT") {
+    const amt = c.discountAmount ?? 0;
+    return amt > 0 ? `할인권 ${amt.toLocaleString()}원` : "할인권";
+  }
+  return c.discount || "";  // 레거시 free-form
+}
+
+// 8자 영숫자 (대문자 + 숫자, 시각적 혼동 문자 제외)
+function generateReservationCode(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let s = "";
+  for (let i = 0; i < 8; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  return s;
 }
 
 export interface ShopPost {
@@ -731,7 +762,12 @@ function loadCoupons(): CouponData[] {
   try {
     if (!fs.existsSync(COUPONS_PATH)) { fs.writeFileSync(COUPONS_PATH, "[]"); return []; }
     const raw = JSON.parse(fs.readFileSync(COUPONS_PATH, "utf-8")) as CouponData[];
-    return raw.map((c) => ({ ...c, type: c.type ?? "coupon" }));
+    return raw.map((c) => {
+      const next: CouponData = { ...c, type: c.type ?? "coupon" };
+      // couponType 가 채워져 있으면 표시용 라벨을 항상 동기화 (레거시 free-form 은 보존)
+      if (next.couponType) next.discount = couponLabel(next);
+      return next;
+    });
   } catch { return []; }
 }
 
@@ -773,7 +809,10 @@ function saveUserCoupons(data: UserCoupon[]) {
   fs.writeFileSync(USER_COUPONS_PATH, JSON.stringify(data, null, 2));
 }
 
-export async function claimCoupon(userId: number, couponId: number): Promise<{ ok: boolean; error?: string }> {
+export async function claimCoupon(
+  userId: number,
+  couponId: number,
+): Promise<{ ok: boolean; error?: string; reservationCode?: string }> {
   const coupons = loadCoupons();
   const coupon = coupons.find((c) => c.id === couponId);
   if (!coupon) return { ok: false, error: "쿠폰을 찾을 수 없습니다." };
@@ -793,9 +832,22 @@ export async function claimCoupon(userId: number, couponId: number): Promise<{ o
 
   const user = await getUserById(userId);
   const id = ucs.length ? Math.max(...ucs.map((uc) => uc.id)) + 1 : 1;
-  ucs.push({ id, userId, username: user?.username ?? "", couponId, claimedAt: new Date().toISOString().slice(0, 10) });
+
+  // 예약 코드 — 기존 코드와 충돌 시 재생성 (현실적으로 32^8 → 충돌 확률 무시 가능, 그래도 가드)
+  const existing = new Set(ucs.map((uc) => uc.reservationCode).filter(Boolean) as string[]);
+  let reservationCode = generateReservationCode();
+  while (existing.has(reservationCode)) reservationCode = generateReservationCode();
+
+  ucs.push({
+    id,
+    userId,
+    username: user?.username ?? "",
+    couponId,
+    claimedAt: new Date().toISOString().slice(0, 10),
+    reservationCode,
+  });
   saveUserCoupons(ucs);
-  return { ok: true };
+  return { ok: true, reservationCode };
 }
 
 export function markCouponUsed(userCouponId: number) {
@@ -817,6 +869,64 @@ export function getCouponClaimCounts(): Record<number, number> {
   const counts: Record<number, number> = {};
   for (const uc of loadUserCoupons()) counts[uc.couponId] = (counts[uc.couponId] ?? 0) + 1;
   return counts;
+}
+
+export function getUserCouponById(userCouponId: number): UserCoupon | null {
+  return loadUserCoupons().find((uc) => uc.id === userCouponId) ?? null;
+}
+
+// 업소 사장 [사용 확인] 화면용 — 본인 owned 쿠폰을 받은 user_coupon 중 q (닉네임/예약코드/username)로 검색
+export interface ShopVerifyResult {
+  userCoupon: UserCoupon;
+  coupon:     CouponData;
+  user:       { id: number; username: string; nickname: string };
+}
+
+export async function searchShopUserCoupons(opts: {
+  ownerUserId: number;
+  q: string;
+  includeUsed?: boolean;
+}): Promise<ShopVerifyResult[]> {
+  const q = opts.q.trim();
+  if (!q) return [];
+
+  const myCoupons   = loadCoupons().filter((c) => c.ownerUserId === opts.ownerUserId);
+  if (myCoupons.length === 0) return [];
+  const myCouponIds = new Set(myCoupons.map((c) => c.id));
+
+  const ucs = loadUserCoupons().filter((uc) => myCouponIds.has(uc.couponId));
+  if (ucs.length === 0) return [];
+
+  // 후보 user 일괄 조회 (Postgres) — 받은 사람들 중 닉/유저네임/예약코드 매칭
+  const userIds = [...new Set(ucs.map((uc) => uc.userId))];
+  const users = await prisma.user.findMany({
+    where: { id: { in: userIds } },
+    select: { id: true, username: true, nickname: true },
+  });
+  const byId = new Map(users.map((u) => [u.id, u]));
+
+  const codeMatch     = q.toUpperCase();
+  const nicknameMatch = q.toLowerCase();
+
+  const out: ShopVerifyResult[] = [];
+  for (const uc of ucs) {
+    if (!opts.includeUsed && uc.usedAt) continue;
+    const user = byId.get(uc.userId);
+    if (!user) continue;
+    const matched =
+      (uc.reservationCode && uc.reservationCode === codeMatch) ||
+      user.nickname.toLowerCase().includes(nicknameMatch) ||
+      user.username.toLowerCase().includes(nicknameMatch);
+    if (!matched) continue;
+    const coupon = myCoupons.find((c) => c.id === uc.couponId);
+    if (!coupon) continue;
+    out.push({
+      userCoupon: uc,
+      coupon,
+      user: { id: user.id, username: user.username, nickname: user.nickname },
+    });
+  }
+  return out.sort((a, b) => b.userCoupon.claimedAt.localeCompare(a.userCoupon.claimedAt));
 }
 
 export function getShopCouponStats(ownerUserId: number): Array<CouponData & { claimCount: number; usedCount: number }> {

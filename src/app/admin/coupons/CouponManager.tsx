@@ -31,7 +31,8 @@ export default function CouponManager({ initialCoupons, shopUsers, menuCouponVis
 
   const handleCreate = (formData: FormData) => {
     startTransition(async () => {
-      await actionCreateCoupon(formData);
+      const r = await actionCreateCoupon(formData);
+      if (r?.error) { alert(r.error); return; }
       router.refresh();
       setShowNew(false);
     });
@@ -39,7 +40,8 @@ export default function CouponManager({ initialCoupons, shopUsers, menuCouponVis
 
   const handleUpdate = (formData: FormData) => {
     startTransition(async () => {
-      await actionUpdateCoupon(formData);
+      const r = await actionUpdateCoupon(formData);
+      if (r?.error) { alert(r.error); return; }
       router.refresh();
       setEditing(null);
     });
@@ -267,12 +269,34 @@ function CouponForm({
             placeholder={type === "coupon" ? "예: 신규 가입 특별 할인" : "예: 봄맞이 이벤트"}
             className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400" />
         </div>
-        <div>
-          <label className="text-xs text-gray-500 block mb-1">할인 / 혜택</label>
-          <input type="text" name="discount" defaultValue={coupon?.discount} required
-            placeholder="예: 10% 할인 / 무료 체험"
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400" />
-        </div>
+        {type === "coupon" ? (
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">쿠폰 종류</label>
+            <select name="couponType" defaultValue={coupon?.couponType ?? "DISCOUNT"} required
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400 bg-white">
+              <option value="ORIGINAL_PRICE">원가권 (ORIGINAL_PRICE)</option>
+              <option value="FREE">무료권 (FREE)</option>
+              <option value="DISCOUNT">할인권 (DISCOUNT)</option>
+            </select>
+          </div>
+        ) : (
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">할인 / 혜택</label>
+            <input type="text" name="discount" defaultValue={coupon?.discount} required
+              placeholder="예: 10% 할인 / 무료 체험"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400" />
+          </div>
+        )}
+        {type === "coupon" && (
+          <div>
+            <label className="text-xs text-gray-500 block mb-1">할인 금액 (원)</label>
+            <input type="number" name="discountAmount" defaultValue={coupon?.discountAmount ?? ""}
+              min={1000} max={1_000_000} step={1000}
+              placeholder="DISCOUNT 일 때만 입력 (1,000 ~ 1,000,000)"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400" />
+            <p className="text-[11px] text-gray-400 mt-1">원가권/무료권은 비워둬도 됩니다.</p>
+          </div>
+        )}
         <div>
           <label className="text-xs text-gray-500 block mb-1">담당 업소회원</label>
           <select name="ownerUserId" defaultValue={coupon?.ownerUserId?.toString() ?? ""}
