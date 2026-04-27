@@ -37,7 +37,7 @@ export default async function AdminMessagesPage({ searchParams }: Props) {
     }),
     prisma.message.count({ where }),
     prisma.user.findMany({
-      where: { status: "ACTIVE" },
+      where: { status: "ACTIVE", isVirtual: false },   // 가상(스크랩) 계정 제외 — 직접 발송 의미 없음
       select: { id: true, username: true, nickname: true, role: true },
       orderBy: { id: "asc" },
     }),

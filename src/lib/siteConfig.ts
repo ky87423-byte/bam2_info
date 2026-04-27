@@ -25,18 +25,27 @@ const DEFAULT: SiteConfigData = {
   updatedAt: new Date(0),
 };
 
-/** 항상 1행만 존재하는 SiteConfig 를 조회. 없으면 default 반환. */
+// ── In-process 캐시 (5분 TTL) ────────────────────────────────────────────
+//   헤더가 거의 모든 페이지에서 호출 → DB 쿼리 1만큼 절약.
+//   updateSiteConfig 가 즉시 invalidate.
+const CACHE_TTL_MS = 5 * 60_000;
+let _cache: { at: number; data: SiteConfigData } | null = null;
+
 export async function getSiteConfig(): Promise<SiteConfigData> {
+  if (_cache && Date.now() - _cache.at < CACHE_TTL_MS) return _cache.data;
   try {
     const row = await prisma.siteConfig.findUnique({ where: { id: 1 } });
-    if (!row) return DEFAULT;
-    return {
-      id: row.id,
-      isShopCommunityActive: row.isShopCommunityActive,
-      mainLayout:   String(row.mainLayout)   as MainLayoutValue,
-      filterLayout: String(row.filterLayout) as FilterLayoutValue,
-      updatedAt: row.updatedAt,
-    };
+    const data: SiteConfigData = row
+      ? {
+          id: row.id,
+          isShopCommunityActive: row.isShopCommunityActive,
+          mainLayout:   String(row.mainLayout)   as MainLayoutValue,
+          filterLayout: String(row.filterLayout) as FilterLayoutValue,
+          updatedAt: row.updatedAt,
+        }
+      : DEFAULT;
+    _cache = { at: Date.now(), data };
+    return data;
   } catch {
     return DEFAULT;
   }
@@ -59,4 +68,5 @@ export async function updateSiteConfig(data: Partial<Omit<SiteConfigData, "id" |
       filterLayout: (data.filterLayout ?? "DOUBLE_TAB") as FilterLayout,
     },
   });
+  _cache = null;        // 즉시 invalidate — 다음 호출이 fresh DB read
 }

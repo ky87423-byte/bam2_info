@@ -186,36 +186,66 @@ type ShopOverride = Partial<Omit<ShopData, "id" | "createdAt" | "updatedAt" | "p
   deleted?: boolean;
 };
 
+// ── mtime 기반 in-process 캐시 ────────────────────────────────────────────
+// shops.json (5MB) / shop_overrides.json 를 매 요청마다 fs.readFileSync + JSON.parse
+// 하지 않도록 mtime 비교로 invalidate. 스크래퍼 sync/admin override 로 파일이 바뀌면
+// mtime 변경 → 다음 호출에서 자동 재로드.
+type RawShop = {
+  company: string; subject: string; content: string; area: string;
+  bizType?: string; category?: string; category2?: string;
+  phone: string; hphone: string;
+  telegram: string; hit: number; price: number; mainPhoto: string;
+  photos: string; time1: string; time2: string; timeFull: number; scrapedAt: string;
+};
+
+let _rawCache:       { mtime: number; data: RawShop[] } | null = null;
+let _overrideCache:  { mtime: number; data: Record<string, ShopOverride> } | null = null;
+let _shopsCache:     { rawMtime: number; ovMtime: number; data: ShopData[] } | null = null;
+
+function fileMtime(p: string): number {
+  try { return fs.statSync(p).mtimeMs; } catch { return 0; }
+}
+
 function loadOverrides(): Record<string, ShopOverride> {
+  const m = fileMtime(OVERRIDE_PATH);
+  if (m === 0) { _overrideCache = null; return {}; }
+  if (_overrideCache && _overrideCache.mtime === m) return _overrideCache.data;
   try {
-    if (!fs.existsSync(OVERRIDE_PATH)) return {};
-    return JSON.parse(fs.readFileSync(OVERRIDE_PATH, "utf-8"));
+    const data = JSON.parse(fs.readFileSync(OVERRIDE_PATH, "utf-8"));
+    _overrideCache = { mtime: m, data };
+    return data;
   } catch { return {}; }
 }
 
 function saveOverrides(overrides: Record<string, ShopOverride>) {
   ensureDir();
   fs.writeFileSync(OVERRIDE_PATH, JSON.stringify(overrides, null, 2));
+  _overrideCache = null;        // 즉시 invalidate (다음 read 에서 mtime 새로 읽음)
+  _shopsCache    = null;
 }
 
 // ── 업소 CRUD ────────────────────────────────────────────────────────────────
-function loadRaw() {
+function loadRaw(): RawShop[] {
+  const m = fileMtime(SHOPS_PATH);
+  if (m === 0) return [];
+  if (_rawCache && _rawCache.mtime === m) return _rawCache.data;
   try {
-    return JSON.parse(fs.readFileSync(SHOPS_PATH, "utf-8")) as Array<{
-      company: string; subject: string; content: string; area: string;
-      bizType?: string; category?: string; category2?: string;
-      phone: string; hphone: string;
-      telegram: string; hit: number; price: number; mainPhoto: string;
-      photos: string; time1: string; time2: string; timeFull: number; scrapedAt: string;
-    }>;
+    const data = JSON.parse(fs.readFileSync(SHOPS_PATH, "utf-8")) as RawShop[];
+    _rawCache = { mtime: m, data };
+    return data;
   } catch { return []; }
 }
 
 function loadShops(): ShopData[] {
+  const rawMtime = fileMtime(SHOPS_PATH);
+  const ovMtime  = fileMtime(OVERRIDE_PATH);
+  if (_shopsCache && _shopsCache.rawMtime === rawMtime && _shopsCache.ovMtime === ovMtime) {
+    return _shopsCache.data;
+  }
   const raw = loadRaw();
   const overrides = loadOverrides();
 
-  return raw
+  const result = raw
     .filter((s) => s.company)
     .map((s, i) => {
       const id = i + 1;
@@ -246,6 +276,9 @@ function loadShops(): ShopData[] {
       } as ShopData;
     })
     .filter(Boolean) as ShopData[];
+
+  _shopsCache = { rawMtime, ovMtime, data: result };
+  return result;
 }
 
 const PAGE_SIZE = 20;

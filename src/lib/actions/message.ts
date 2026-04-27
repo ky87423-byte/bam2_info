@@ -42,6 +42,8 @@ export async function sendMessageAction(input: SendMessageInput): Promise<Action
     select: { id: true, status: true, isVirtual: true },
   });
   if (!receiver) return { ok: false, error: "받는 사람을 찾을 수 없습니다." };
+  // BLOCKED 회원에게는 발송 차단 — 차단당한 사용자에게 쪽지가 쌓이는 것 방지
+  if (receiver.status === "BLOCKED") return { ok: false, error: "받는 사람이 차단된 회원입니다." };
 
   // ── 우회 분기: 수신자가 가상 계정이면 AdminInquiry 로 저장 ──
   if (receiver.isVirtual) {

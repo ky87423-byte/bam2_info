@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { auth, signOut } from "@/auth";
-import { getShopPosts, getUsers, getShops } from "@/lib/data";
+import { getShopPosts } from "@/lib/data";
 import { prisma } from "@/lib/prisma";
 import {
   LayoutDashboard, Store, Users, Tag, MessageSquare, Mail, Inbox, ShieldCheck, RefreshCw,
   Ticket, BarChart2, Settings, LogOut, Coins, Calendar, FileText,
 } from "lucide-react";
 import AdminPendingBadge from "./AdminPendingBadge";
+import AdminSidebarShell from "./AdminSidebarShell";
 
 const navItems = [
   { href: "/admin",            label: "대시보드",      icon: LayoutDashboard },
@@ -29,31 +30,25 @@ const navItems = [
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
 
-  // 업소 게시글 승인 대기
+  // 업소 게시글 승인 대기 (file-based, mtime 캐시 적용됨)
   const shopPostPending = getShopPosts({ status: "pending" }).total;
 
-  // 업소 총 갯수
-  const { total: shopTotal } = getShops("", "", 1, 9999);
-
-  // 업소회원 가입 승인 대기
-  const { users: allUsers } = await getUsers("", 1, 9999);
-  const memberPending = allUsers.filter((u) => u.role === "shop" && u.status === "blocked").length;
-
-  // 신착 카운트 — 쪽지(미확인) / 인콰이어리(NEW) / 클레임(PENDING)
-  const [messagesUnacked, inquiriesNew, claimsPending] = await Promise.all([
+  // 사이드바 카운트 — find/findMany 회수, 모두 indexed COUNT 직접 호출
+  const [shopTotal, memberPending, messagesUnacked, inquiriesNew, claimsPending] = await Promise.all([
+    prisma.shop.count({ where: { isVisible: true } }),
+    prisma.user.count({ where: { role: "SHOP", status: "BLOCKED", isVirtual: false } }),
     prisma.message.count({ where: { adminAcknowledgedAt: null } }),
     prisma.adminInquiry.count({ where: { status: "NEW" } }),
     prisma.claimRequest.count({ where: { status: "PENDING" } }),
   ]);
 
-  return (
-    <div className="min-h-screen flex bg-gray-100">
-      <aside className="w-56 shrink-0 bg-[#1a1a2e] text-white flex flex-col">
-        <div className="px-6 py-5 border-b border-white/10">
-          <span className="text-yellow-400 font-bold text-lg tracking-wide">BAM Admin</span>
-        </div>
-        <nav className="flex-1 px-3 py-4 flex flex-col gap-0.5">
-          {navItems.map(({ href, label, icon: Icon }) => (
+  const sidebarBody = (
+    <>
+      <div className="px-6 py-5 border-b border-white/10">
+        <span className="text-yellow-400 font-bold text-lg tracking-wide">BAM Admin</span>
+      </div>
+      <nav className="flex-1 px-3 py-4 flex flex-col gap-0.5">
+        {navItems.map(({ href, label, icon: Icon }) => (
             <Link key={href} href={href}
               className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-white/70 hover:text-white hover:bg-white/10 transition-colors">
               <Icon size={16} />
@@ -111,39 +106,40 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                 />
               )}
             </Link>
-          ))}
-        </nav>
-        <div className="px-3 py-4 border-t border-white/10 space-y-0.5">
-          <Link href="/attend"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-white/50 hover:text-white hover:bg-white/10 transition-colors">
-            <Calendar size={16} />
-            출석부
-          </Link>
-          <Link href="/"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-white/50 hover:text-white hover:bg-white/10 transition-colors">
-            <LogOut size={16} />
-            사이트로 이동
-          </Link>
-        </div>
-      </aside>
-
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="bg-white border-b px-6 py-3 flex items-center justify-between shadow-sm">
-          <h1 className="text-sm font-semibold text-gray-600">관리자 페이지</h1>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-gray-500">{session?.user?.name ?? "admin"}</span>
-            <form action={async () => {
-              "use server";
-              await signOut({ redirectTo: "/login" });
-            }}>
-              <button type="submit" className="text-xs text-red-500 hover:text-red-700 transition-colors px-2 py-1 rounded hover:bg-red-50">
-                로그아웃
-              </button>
-            </form>
-          </div>
-        </header>
-        <main className="flex-1 p-6 overflow-auto">{children}</main>
+        ))}
+      </nav>
+      <div className="px-3 py-4 border-t border-white/10 space-y-0.5">
+        <Link href="/attend"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-white/50 hover:text-white hover:bg-white/10 transition-colors">
+          <Calendar size={16} />
+          출석부
+        </Link>
+        <Link href="/"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-white/50 hover:text-white hover:bg-white/10 transition-colors">
+          <LogOut size={16} />
+          사이트로 이동
+        </Link>
       </div>
-    </div>
+    </>
+  );
+
+  return (
+    <AdminSidebarShell
+      pageTitle="관리자 페이지"
+      username={session?.user?.name ?? "admin"}
+      rightSlot={
+        <form action={async () => {
+          "use server";
+          await signOut({ redirectTo: "/login" });
+        }}>
+          <button type="submit" className="text-xs text-red-500 hover:text-red-700 transition-colors px-2 py-1 rounded hover:bg-red-50">
+            로그아웃
+          </button>
+        </form>
+      }
+      mainContent={children}
+    >
+      {sidebarBody}
+    </AdminSidebarShell>
   );
 }
