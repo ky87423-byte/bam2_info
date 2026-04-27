@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { prisma } from "./prisma";
+import { getViewCounts } from "./viewTracker";
 import { UserRole, UserStatus, PointAction as DbPointAction } from "@/generated/prisma/enums";
 
 const SHOPS_PATH       = path.join(process.cwd(), "scraper", "scraped_data", "shops.json");
@@ -239,8 +240,11 @@ function loadRaw(): RawShop[] {
 function loadShops(): ShopData[] {
   const rawMtime = fileMtime(SHOPS_PATH);
   const ovMtime  = fileMtime(OVERRIDE_PATH);
+  // 우리 사이트에서 누적된 조회수 (file 원본 hit 와 합산해 표시)
+  const persistedViews = getViewCounts("shop");
   if (_shopsCache && _shopsCache.rawMtime === rawMtime && _shopsCache.ovMtime === ovMtime) {
-    return _shopsCache.data;
+    // raw/override 캐시 hit — viewCounts 만 즉시 합산해서 반환 (캐시 데이터의 hit 는 file base 값)
+    return _shopsCache.data.map((s) => ({ ...s, hit: s.hit + (persistedViews[String(s.id)] ?? 0) }));
   }
   const raw = loadRaw();
   const overrides = loadOverrides();
@@ -263,7 +267,7 @@ function loadShops(): ShopData[] {
         phone:     ov.phone     ?? s.phone ?? "",
         hphone:    ov.hphone    ?? s.hphone ?? "",
         telegram:  ov.telegram  ?? s.telegram ?? "",
-        hit:       s.hit ?? 0,
+        hit:       s.hit ?? 0,        // file 원본만 캐시 — viewCounts 는 return 시 합산
         price:     ov.price     ?? s.price ?? 0,
         mainPhoto: ov.mainPhoto ?? s.mainPhoto ?? "",
         photos:    ov.photos    ?? (s.photos ? s.photos.split(",").filter(Boolean) : []),
@@ -278,7 +282,8 @@ function loadShops(): ShopData[] {
     .filter(Boolean) as ShopData[];
 
   _shopsCache = { rawMtime, ovMtime, data: result };
-  return result;
+  // 첫 로드도 viewCounts 합산해서 반환
+  return result.map((s) => ({ ...s, hit: s.hit + (persistedViews[String(s.id)] ?? 0) }));
 }
 
 const PAGE_SIZE = 20;
@@ -601,6 +606,14 @@ export async function awardPoints(
     });
     return newBalance;
   });
+
+  // 랭킹 캐시 즉시 무효화 — 출석/게시글/댓글/admin 지급 등 모든 포인트 이벤트에서 호출됨
+  // (dynamic import — circular dep 회피)
+  try {
+    const { clearRankingCache } = await import("./actions/ranking");
+    await clearRankingCache();
+  } catch { /* 캐시 모듈 로드 실패는 무시 */ }
+
   return result;
 }
 

@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { Clock, Eye, DollarSign, ChevronLeft } from "lucide-react";
 import { getShopById } from "@/lib/data";
 import { recordAnalyticsEvent, extractIpFromHeaders } from "@/lib/api/events";
+import { incrementView } from "@/lib/viewTracker";
 import { EventType } from "@/generated/prisma/enums";
 import ContactButtons from "./ContactButtons";
 import ClaimListingBanner from "@/components/shop/ClaimListingBanner";
@@ -23,10 +24,11 @@ export default async function ShopDetailPage({ params }: Props) {
   const shop = getShopById(shopId);
   if (!shop) notFound();
 
-  // VIEW 이벤트 기록 (실패해도 페이지 렌더링 중단 안 함)
+  // VIEW 이벤트 기록 + 조회수 +1 (둘 다 1시간 IP dedup. 실패해도 페이지 렌더링 중단 안 함)
   try {
     const reqHeaders = await headers();
     const ipAddress = extractIpFromHeaders(reqHeaders);
+    incrementView("shop", shopId, ipAddress);     // file-based, 카드/상세 조회수 표시용
     await recordAnalyticsEvent({ storeId: shopId, eventType: EventType.VIEW, ipAddress });
   } catch {
     // DB 미연결 시 무시

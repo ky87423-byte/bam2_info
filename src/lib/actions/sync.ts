@@ -73,7 +73,8 @@ export async function syncShopsFromJsonAction(): Promise<SyncActionResult> {
         return;
       }
 
-      const data = {
+      // 공통 필드 (신규/업데이트 모두 적용)
+      const baseData = {
         company:   row.company || `업소 #${row.externalId}`,
         subject:   row.subject ?? "",
         content:   row.content ?? "",
@@ -84,7 +85,6 @@ export async function syncShopsFromJsonAction(): Promise<SyncActionResult> {
         phone:     row.phone ?? "",
         hphone:    row.hphone ?? "",
         telegram:  row.telegram ?? "",
-        hit:       row.hit   ?? 0,
         price:     row.price ?? 0,
         mainPhoto: row.mainPhoto ?? "",
         photos:    Array.isArray(row.photos) ? row.photos
@@ -106,12 +106,14 @@ export async function syncShopsFromJsonAction(): Promise<SyncActionResult> {
 
       let shopId: number;
       if (existing) {
-        await prisma.shop.update({ where: { externalId: row.externalId }, data });
+        // ⚠ update 시 hit 는 제외 — 우리 사이트에서 누적된 조회수 보존
+        await prisma.shop.update({ where: { externalId: row.externalId }, data: baseData });
         shopId = existing.id;
         updated++;
       } else {
+        // 신규: 원본 사이트의 hit 를 초기값으로 가져옴
         const newShop = await prisma.shop.create({
-          data: { ...data, externalId: row.externalId },
+          data: { ...baseData, hit: row.hit ?? 0, externalId: row.externalId },
           select: { id: true },
         });
         shopId = newShop.id;
@@ -121,7 +123,7 @@ export async function syncShopsFromJsonAction(): Promise<SyncActionResult> {
       // 가상 user lazy 생성 (이미 있으면 no-op)
       const hadVirtual = !!existing?.virtualUserId;
       try {
-        await ensureVirtualUserForShop({ id: shopId, company: data.company });
+        await ensureVirtualUserForShop({ id: shopId, company: baseData.company });
         if (!hadVirtual) virtualUsersCreated++;
       } catch (e) {
         // 가상 user 생성 실패는 sync 실패가 아님 — 로그만
