@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Calendar, User, LogOut, LogIn, UserPlus, Store, Tag, Ticket, Shield, Lock, Menu, X } from "lucide-react";
+import { Calendar, User, LogOut, LogIn, UserPlus, Store, Tag, Ticket, Shield, Lock, Menu, X, UserCircle } from "lucide-react";
 import UnreadMessageBadge from "./messages/UnreadMessageBadge";
 import PointsBadge from "./PointsBadge";
 
@@ -48,6 +48,9 @@ export default function HeaderNav({ user, showShopCommunity, menuCouponVisible, 
     <>
       <Link href="/posts" onClick={close} className={navLinkClass}>
         <Store size={14} /> 업소 게시글
+      </Link>
+      <Link href="/anonymous" onClick={close} className={navLinkClass}>
+        <UserCircle size={14} /> 익명게시판
       </Link>
       {menuCouponVisible && (
         <Link href="/coupons" onClick={close} className={navLinkClass}>

@@ -1,17 +1,29 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { extractIpFromHeaders } from "@/lib/api/events";
+import { shouldCount } from "@/lib/viewTracker";
 
 export type BoardPostResult<T = void> =
   | { ok: true; data?: T }
   | { ok: false; error: string };
 
-// ── 권한 체크 헬퍼 (shop_only 카테고리는 shop|admin 만) ──────────────────
+// ── 권한 체크 헬퍼 (카테고리별 정책) ──────────────────────────────────────
 function canPostInCategory(role: string | undefined, category: string): boolean {
   if (category === "shop_only") return role === "shop" || role === "admin";
-  return true; // 다른 카테고리는 일반 회원도 가능 (미래 확장)
+  // anonymous: 모든 로그인 사용자 (USER/SHOP/ADMIN)
+  // 그 외: 모든 로그인 사용자 (default)
+  return true;
+}
+
+// ── 카테고리별 base path 매핑 (revalidate / 리다이렉트 용) ────────────────
+function basePath(category: string): string {
+  if (category === "shop_only") return "/shop-community";
+  if (category === "anonymous") return "/anonymous";
+  return "/posts";   // 미래 확장
 }
 
 // ── 작성 ─────────────────────────────────────────────────────────────
@@ -41,7 +53,7 @@ export async function createBoardPostAction(input: {
     select: { id: true },
   });
 
-  revalidatePath(`/shop-community`);
+  revalidatePath(basePath(input.category));
   return { ok: true, data: { id: post.id } };
 }
 
@@ -69,8 +81,9 @@ export async function updateBoardPostAction(input: {
   if (!content || content.length > 20_000) return { ok: false, error: "내용은 1~20000자 이내로 입력하세요." };
 
   await prisma.boardPost.update({ where: { id: input.id }, data: { title, content } });
-  revalidatePath(`/shop-community/${input.id}`);
-  revalidatePath(`/shop-community`);
+  const base = basePath(post.category);
+  revalidatePath(`${base}/${input.id}`);
+  revalidatePath(base);
   return { ok: true };
 }
 
@@ -89,7 +102,7 @@ export async function deleteBoardPostAction(id: number): Promise<BoardPostResult
   if (post.authorId !== userId && !isAdmin) return { ok: false, error: "삭제 권한이 없습니다." };
 
   await prisma.boardPost.update({ where: { id }, data: { deletedAt: new Date() } });
-  revalidatePath(`/shop-community`);
+  revalidatePath(basePath(post.category));
   return { ok: true };
 }
 
@@ -109,11 +122,11 @@ export async function getBoardPosts(category: string, page = 1, pageSize = 20) {
     prisma.boardPost.count({ where }),
   ]);
 
-  // Comment 테이블에서 게시글별 댓글 수 집계 (한 번의 쿼리)
+  // Comment 테이블에서 게시글별 댓글 수 집계 (한 번의 쿼리, targetType=category)
   const ids = rows.map((r) => r.id);
   const commentCounts = ids.length === 0 ? [] : await prisma.comment.groupBy({
     by: ["targetId"],
-    where: { targetType: "shop_only", targetId: { in: ids }, deletedAt: null },
+    where: { targetType: category, targetId: { in: ids }, deletedAt: null },
     _count: { id: true },
   });
   const commentMap = new Map(commentCounts.map((c) => [c.targetId, c._count.id]));
@@ -132,7 +145,13 @@ export async function getBoardPostById(id: number) {
     },
   });
   if (!post || post.deletedAt) return null;
-  // 조회수 +1 (best-effort, 실패해도 무시)
-  prisma.boardPost.update({ where: { id }, data: { viewCount: { increment: 1 } } }).catch(() => {});
+  // 조회수 +1 — IP+post id 1시간 dedup. best-effort (실패해도 페이지 렌더 안 끊김)
+  try {
+    const reqHeaders = await headers();
+    const ip = extractIpFromHeaders(reqHeaders);
+    if (shouldCount(`board:${post.category}:${id}:${ip}`)) {
+      prisma.boardPost.update({ where: { id }, data: { viewCount: { increment: 1 } } }).catch(() => {});
+    }
+  } catch { /* headers() 호출 컨텍스트 외 — dedup 없이 +1 안 함 (안전) */ }
   return post;
 }

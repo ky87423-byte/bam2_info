@@ -5,8 +5,13 @@ import CommentForm from "./CommentForm";
 import { MessageSquare } from "lucide-react";
 
 interface Props {
-  boardType: string;   // 'promotion' | 'free' | 'notice' | ...
+  boardType: string;   // 'promotion' | 'free' | 'notice' | 'anonymous' | ...
   postId:    number;
+}
+
+// 익명 모드 자동 판정 — boardType="anonymous" 면 닉네임/역할 가림
+function isAnonymousBoard(boardType: string): boolean {
+  return boardType === "anonymous";
 }
 
 /**
@@ -55,6 +60,7 @@ export default async function CommentSection({ boardType, postId }: Props) {
             postId={postId}
             currentUserId={session?.user?.id ? parseInt(session.user.id, 10) : null}
             currentUserRole={session?.user?.role ?? null}
+            anonymous={isAnonymousBoard(boardType)}
           />
         </div>
       </div>

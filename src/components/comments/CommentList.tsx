@@ -13,9 +13,10 @@ interface Props {
   postId: number;
   currentUserId: number | null;
   currentUserRole: string | null;
+  anonymous?: boolean;       // true 면 작성자 닉네임/역할 가림 + UserActionMenu 무력화
 }
 
-export default function CommentList({ comments, boardType, postId, currentUserId, currentUserRole }: Props) {
+export default function CommentList({ comments, boardType, postId, currentUserId, currentUserRole, anonymous = false }: Props) {
   if (comments.length === 0) {
     return (
       <div className="text-center py-10 text-sm text-gray-400">
@@ -34,6 +35,7 @@ export default function CommentList({ comments, boardType, postId, currentUserId
           postId={postId}
           currentUserId={currentUserId}
           currentUserRole={currentUserRole}
+          anonymous={anonymous}
         />
       ))}
     </ul>
@@ -41,13 +43,14 @@ export default function CommentList({ comments, boardType, postId, currentUserId
 }
 
 function CommentItem({
-  comment, boardType, postId, currentUserId, currentUserRole, depth = 0,
+  comment, boardType, postId, currentUserId, currentUserRole, anonymous = false, depth = 0,
 }: {
   comment: CommentTreeNode;
   boardType: string;
   postId: number;
   currentUserId: number | null;
   currentUserRole: string | null;
+  anonymous?: boolean;
   depth?: number;
 }) {
   const [showReply, setShowReply] = useState(false);
@@ -68,20 +71,34 @@ function CommentItem({
   return (
     <li className={depth > 0 ? "ml-8 pl-3 border-l-2 border-gray-100 py-3" : "py-4"}>
       <div className="flex items-start gap-3">
-        {/* 아바타 */}
+        {/* 아바타 — 익명 모드면 일괄 회색 '?' */}
         <div className={[
           "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0",
-          comment.authorRole === "admin" ? "bg-purple-100 text-purple-700"
+          anonymous ? "bg-gray-200 text-gray-500"
+          : comment.authorRole === "admin" ? "bg-purple-100 text-purple-700"
           : comment.authorRole === "shop" ? "bg-blue-100 text-blue-700"
           : "bg-gray-100 text-gray-600",
         ].join(" ")}>
-          {comment.authorNickname.slice(0, 1)}
+          {anonymous ? "?" : comment.authorNickname.slice(0, 1)}
         </div>
 
         <div className="flex-1 min-w-0">
           {/* 닉네임(클릭 메뉴) + 역할 + 행운배지 + 시간 */}
           <div className="flex items-center gap-2 flex-wrap">
-            {comment.deletedAt ? (
+            {anonymous ? (
+              // 익명 모드 — 본인이거나 admin 이면 작은 식별 라벨, 그 외엔 그냥 "익명"
+              <>
+                <span className="text-sm font-semibold text-gray-700">익명</span>
+                {currentUserId !== null && comment.authorId === currentUserId && (
+                  <span className="text-[10px] text-gray-400">(나)</span>
+                )}
+                {currentUserRole === "admin" && (
+                  <span className="text-[10px] text-gray-400">
+                    (admin: {comment.authorNickname} #{comment.authorId})
+                  </span>
+                )}
+              </>
+            ) : comment.deletedAt ? (
               <span className="text-sm font-semibold text-gray-400">{comment.authorNickname}</span>
             ) : (
               <UserActionMenu
@@ -92,12 +109,12 @@ function CommentItem({
                 className="text-sm font-semibold text-gray-800"
               />
             )}
-            {comment.authorRole === "admin" && (
+            {!anonymous && comment.authorRole === "admin" && (
               <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-600 font-semibold">
                 <Shield size={9} /> 관리자
               </span>
             )}
-            {comment.authorRole === "shop" && (
+            {!anonymous && comment.authorRole === "shop" && (
               <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 font-semibold">
                 <Store size={9} /> 업소
               </span>
@@ -166,6 +183,7 @@ function CommentItem({
                   postId={postId}
                   currentUserId={currentUserId}
                   currentUserRole={currentUserRole}
+                  anonymous={anonymous}
                   depth={depth + 1}
                 />
               ))}
