@@ -11,6 +11,7 @@ interface Props {
   username:  string;       // /posts?author=username 검색용
   nickname:  string;
   role?:     string;       // 'admin' | 'shop' | 'user'
+  title?:    string | null;  // 랭킹 보상 칭호 (예: "🥇 2026-04 월간 1위")
   className?: string;
 }
 
@@ -18,7 +19,7 @@ interface Props {
  * 닉네임을 클릭하면 팝오버 메뉴가 떠서 [자기소개 / 쪽지보내기 / 게시글검색] 액션 제공.
  * 게시글·댓글 등 닉네임이 노출되는 모든 곳에서 동일하게 사용 가능.
  */
-export default function UserActionMenu({ userId, username, nickname, role, className }: Props) {
+export default function UserActionMenu({ userId, username, nickname, role, title, className }: Props) {
   const [open,    setOpen]    = useState(false);
   const [profile, setProfile] = useState(false);
   const [message, setMessage] = useState(false);
@@ -59,6 +60,14 @@ export default function UserActionMenu({ userId, username, nickname, role, class
           {nickname}
           {role === "admin" && <Shield size={9} className="text-purple-500" />}
           {role === "shop"  && <Store  size={9} className="text-blue-500" />}
+          {title && (
+            <span
+              title={title}
+              className="ml-1 inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-gradient-to-r from-yellow-300 to-amber-400 text-amber-900 shadow-sm whitespace-nowrap"
+            >
+              {title}
+            </span>
+          )}
         </button>
 
         {open && (
