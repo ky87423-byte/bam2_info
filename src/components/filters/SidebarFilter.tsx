@@ -76,11 +76,11 @@ export default function SidebarFilter({ regionGroups, bizTypes }: FilterProps) {
 
   return (
     <>
-      {/* 모바일 토글 버튼 — desktop 에선 숨김 */}
+      {/* 모바일 토글 버튼 — desktop 에선 숨김 / 헤더와 일체화 (위쪽 직선 + shadow) */}
       <button
         type="button"
         onClick={() => setMobileOpen((p) => !p)}
-        className="lg:hidden w-full flex items-center justify-between gap-2 px-4 py-3 mb-3 rounded-2xl bg-[#1a1a2e] text-white"
+        className="lg:hidden w-full flex items-center justify-between gap-2 px-4 py-3 mb-3 -mx-4 rounded-b-2xl bg-[#1a1a2e] text-white shadow-lg"
       >
         <span className="inline-flex items-center gap-2 text-sm font-bold text-yellow-400">
           <FilterIcon size={14} /> 필터

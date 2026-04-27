@@ -75,17 +75,19 @@ export default async function HomePage({ searchParams }: Props) {
     </Suspense>
   );
 
-  // ── filterLayout=SIDEBAR: 페이지 구조 자체가 다름 (좌측 사이드바 + 우측 본문) ─
+  // ── filterLayout=SIDEBAR: 좌측 사이드바 + 우측 본문 (헤더와 일체화) ──────
+  //   모바일: SidebarFilter 자체 다크 토글 버튼이 헤더에 바로 붙음 (pt-0)
+  //   데스크톱: 좌측 사이드바 다크 → 헤더와 같은 색이라 일체감, 본문만 위쪽 padding
   if (filterLayout === "SIDEBAR") {
     return (
-      <div className="max-w-7xl mx-auto px-4 py-6">
+      <div className="max-w-7xl mx-auto px-4 pb-6">
         <div className="lg:grid lg:grid-cols-[240px_1fr] lg:gap-6">
           <aside className="mb-4 lg:mb-0">
             <Suspense fallback={<div className="h-40" />}>
               <FilterComp regionGroups={regionGroups} bizTypes={bizTypes} />
             </Suspense>
           </aside>
-          <main className="min-w-0">
+          <main className="min-w-0 pt-6">
             {resultHeader}
             {shopsGrid}
             {pagination}
@@ -95,17 +97,22 @@ export default async function HomePage({ searchParams }: Props) {
     );
   }
 
-  // ── 그 외 (DOUBLE_TAB / DROPDOWN / TAB_SWITCH): 상단 필터 + 본문 ────────
+  // ── 그 외 (DOUBLE_TAB / DROPDOWN / TAB_SWITCH): 헤더와 일체화된 풀폭 다크 띠 ─
+  //   풀폭 wrapper 라 좌우 흰 띠 0, shadow-lg 로 본문과 입체감 분리
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6">
-      <div className="bg-[#1a1a2e] text-white rounded-2xl p-4 mb-5">
-        <Suspense fallback={<div className="h-12" />}>
-          <FilterComp regionGroups={regionGroups} bizTypes={bizTypes} />
-        </Suspense>
+    <>
+      <div className="bg-[#1a1a2e] text-white shadow-lg">
+        <div className="max-w-7xl mx-auto px-4 py-3">
+          <Suspense fallback={<div className="h-12" />}>
+            <FilterComp regionGroups={regionGroups} bizTypes={bizTypes} />
+          </Suspense>
+        </div>
       </div>
-      {resultHeader}
-      {shopsGrid}
-      {pagination}
-    </div>
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        {resultHeader}
+        {shopsGrid}
+        {pagination}
+      </div>
+    </>
   );
 }
