@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { Search, Ticket, ShieldCheck } from "lucide-react";
 import { auth } from "@/auth";
 import { logoutAction } from "@/lib/actions/auth";
 import { getUserById, getSettings } from "@/lib/data";
@@ -25,7 +25,8 @@ export default async function Header() {
           BAM
         </Link>
 
-        <form action="/" method="GET" className="flex-1 min-w-0 max-w-xl">
+        {/* 검색창 — 검색창을 우측에서 약 20% 축소 (max-w-md → max-w-sm) */}
+        <form action="/" method="GET" className="flex-1 min-w-0 max-w-sm">
           <div className="relative">
             <input
               type="text"
@@ -38,6 +39,26 @@ export default async function Header() {
             </button>
           </div>
         </form>
+
+        {/* 빠른 액션 2종 — 노란/오렌지 그라데이션, sm 이상에서만 노출 (모바일은 햄버거 메뉴에 들어감) */}
+        <div className="hidden sm:flex items-center gap-1.5 shrink-0">
+          <Link
+            href="/coupons"
+            aria-label="쿠폰 수령"
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-gradient-to-r from-yellow-400 to-orange-500 text-[#1a1a2e] text-xs font-bold shadow-md hover:shadow-lg hover:from-yellow-300 hover:to-orange-400 transition-all ring-1 ring-yellow-300/40"
+          >
+            <Ticket size={14} className="shrink-0" />
+            <span className="whitespace-nowrap">🎟️ 쿠폰수령</span>
+          </Link>
+          <Link
+            href="/reviews"
+            aria-label="인증 후기 게시판"
+            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs font-bold shadow-md hover:shadow-lg hover:from-orange-400 hover:to-red-400 transition-all ring-1 ring-orange-400/40"
+          >
+            <ShieldCheck size={14} className="shrink-0" />
+            <span className="whitespace-nowrap">📝 인증후기</span>
+          </Link>
+        </div>
 
         <HeaderNav
           user={user ? {

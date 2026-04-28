@@ -13,6 +13,7 @@ const NOTICES_PATH     = path.join(process.cwd(), "data", "notices.json");
 const ATTENDANCE_PATH  = path.join(process.cwd(), "data", "attendance.json");
 const SHOP_POSTS_PATH  = path.join(process.cwd(), "data", "shop_posts.json");
 const USER_COUPONS_PATH = path.join(process.cwd(), "data", "user_coupons.json");
+const REVIEWS_PATH      = path.join(process.cwd(), "data", "reviews.json");
 
 function ensureDir() {
   const dir = path.join(process.cwd(), "data");
@@ -126,6 +127,46 @@ export interface UserCoupon {
 export const COUPON_AMOUNT_MIN = 1_000;
 export const COUPON_AMOUNT_MAX = 1_000_000;
 
+// ── Review (후기) ──────────────────────────────────────────────────────────
+export const REVIEW_BIZ_TYPES = [
+  "건마", "오피", "술집", "휴게텔", "안마", "노래방", "룸살롱", "기타",
+] as const;
+export type ReviewBizType = (typeof REVIEW_BIZ_TYPES)[number] | string;
+
+export const REVIEW_TAG_PRESET = [
+  "친절함", "청결함", "가성비", "분위기", "재방문 의사", "위생", "프라이버시", "위치",
+] as const;
+
+export const REVIEW_DEADLINE_DAYS = 7;   // 사용 확인 후 N 일 경과 후 미작성 → 신규 쿠폰 발급 차단
+
+export interface ReviewData {
+  id:              number;
+  authorId:        number;
+  authorUsername:  string;     // 시점 보존
+  authorNickname:  string;
+  // 인증 정보 (인증 후기는 출처 user_coupon, 일반 후기는 null)
+  userCouponId?:   number | null;
+  couponId?:       number | null;
+  isCertified:     boolean;
+  // 말머리/메타
+  shopName:        string;     // 인증 후기는 쿠폰의 shopName 자동, 일반은 직접 입력
+  bizType:         string;     // 말머리 (건마/오피/술집 ...)
+  // 본문
+  title:           string;
+  content:         string;
+  photos:          string[];
+  mainPhoto:       string;
+  // 평가 (1~5 별점)
+  ratingFacility:  number;
+  ratingService:   number;
+  ratingPrice:     number;
+  tags:            string[];   // ["친절함", "청결함", ...]
+  // 메타
+  createdAt:       string;
+  updatedAt:       string;
+  deletedAt?:      string;
+}
+
 export function couponLabel(c: Pick<CouponData, "couponType" | "discountAmount" | "discount">): string {
   if (c.couponType === "ORIGINAL_PRICE") return "원가권";
   if (c.couponType === "FREE")           return "무료권";
@@ -205,6 +246,8 @@ export interface SiteSettings {
   pointAttendStreakBonus: number;
   pointPost: number;
   pointComment: number;
+  pointReview: number;            // 일반 후기 작성 보상
+  pointCertifiedReview: number;   // 인증 후기 (쿠폰 사용 후) 보상 — 일반보다 많게
   // 게시판 권한
   boardPermissions: BoardPermissions;
   // 메뉴 노출
@@ -830,6 +873,15 @@ export async function claimCoupon(
     if (count >= coupon.maxIssue) return { ok: false, error: "쿠폰 수량이 소진되었습니다." };
   }
 
+  // 7일 규칙 — 사용 확인 후 N일 경과 + 인증 후기 미작성 user_coupon 이 있으면 신규 발급 차단
+  const overdue = getOverdueUserCoupons(userId);
+  if (overdue.length > 0) {
+    return {
+      ok: false,
+      error: `이전에 사용 확인된 쿠폰의 후기를 ${REVIEW_DEADLINE_DAYS}일 이내에 작성하지 않아 신규 쿠폰 발급이 제한됩니다. 마이페이지에서 후기를 먼저 작성해주세요.`,
+    };
+  }
+
   const user = await getUserById(userId);
   const id = ucs.length ? Math.max(...ucs.map((uc) => uc.id)) + 1 : 1;
 
@@ -929,6 +981,103 @@ export async function searchShopUserCoupons(opts: {
   return out.sort((a, b) => b.userCoupon.claimedAt.localeCompare(a.userCoupon.claimedAt));
 }
 
+// ── Review CRUD ──────────────────────────────────────────────────────────
+function loadReviews(): ReviewData[] {
+  ensureDir();
+  try {
+    if (!fs.existsSync(REVIEWS_PATH)) { fs.writeFileSync(REVIEWS_PATH, "[]"); return []; }
+    return JSON.parse(fs.readFileSync(REVIEWS_PATH, "utf-8"));
+  } catch { return []; }
+}
+
+function saveReviews(data: ReviewData[]) {
+  ensureDir();
+  fs.writeFileSync(REVIEWS_PATH, JSON.stringify(data, null, 2));
+}
+
+export function getReviews(opts: {
+  bizType?: string;
+  authorId?: number;
+  shopName?: string;
+  certifiedOnly?: boolean;
+  q?: string;
+} = {}): ReviewData[] {
+  let rows = loadReviews().filter((r) => !r.deletedAt);
+  if (opts.bizType)       rows = rows.filter((r) => r.bizType === opts.bizType);
+  if (opts.authorId)      rows = rows.filter((r) => r.authorId === opts.authorId);
+  if (opts.shopName)      rows = rows.filter((r) => r.shopName === opts.shopName);
+  if (opts.certifiedOnly) rows = rows.filter((r) => r.isCertified);
+  if (opts.q) {
+    const lq = opts.q.toLowerCase();
+    rows = rows.filter((r) =>
+      r.title.toLowerCase().includes(lq) ||
+      r.content.toLowerCase().includes(lq) ||
+      r.shopName.toLowerCase().includes(lq),
+    );
+  }
+  return rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export function getReviewById(id: number): ReviewData | null {
+  return loadReviews().find((r) => r.id === id && !r.deletedAt) ?? null;
+}
+
+export function createReview(
+  data: Omit<ReviewData, "id" | "createdAt" | "updatedAt">,
+): ReviewData {
+  const reviews = loadReviews();
+  const id = reviews.length ? Math.max(...reviews.map((r) => r.id)) + 1 : 1;
+  const now = new Date().toISOString();
+  const next: ReviewData = { ...data, id, createdAt: now, updatedAt: now };
+  reviews.unshift(next);
+  saveReviews(reviews);
+  return next;
+}
+
+export function updateReview(id: number, patch: Partial<ReviewData>): ReviewData | null {
+  const reviews = loadReviews();
+  const idx = reviews.findIndex((r) => r.id === id);
+  if (idx < 0) return null;
+  reviews[idx] = { ...reviews[idx], ...patch, id: reviews[idx].id, updatedAt: new Date().toISOString() };
+  saveReviews(reviews);
+  return reviews[idx];
+}
+
+export function deleteReview(id: number) {
+  const reviews = loadReviews();
+  const idx = reviews.findIndex((r) => r.id === id);
+  if (idx < 0) return;
+  reviews[idx] = { ...reviews[idx], deletedAt: new Date().toISOString() };
+  saveReviews(reviews);
+}
+
+// 인증 후기 유무 — userCouponId 단위 (이 user_coupon 으로 작성된 인증 후기 1건)
+export function findReviewByUserCouponId(userCouponId: number): ReviewData | null {
+  return loadReviews().find((r) => r.userCouponId === userCouponId && !r.deletedAt) ?? null;
+}
+
+// 7일 규칙 — 사용 확인 후 N 일 경과 + 인증 후기 미작성 user_coupon 목록
+export function getOverdueUserCoupons(userId: number, days = REVIEW_DEADLINE_DAYS): UserCoupon[] {
+  const ucs = loadUserCoupons().filter((uc) => uc.userId === userId && uc.usedAt);
+  if (ucs.length === 0) return [];
+  const reviews = loadReviews().filter((r) => r.authorId === userId && r.userCouponId && !r.deletedAt);
+  const reviewedSet = new Set(reviews.map((r) => r.userCouponId!));
+  const cutoff = Date.now() - days * 86400_000;
+  return ucs.filter((uc) => {
+    if (reviewedSet.has(uc.id)) return false;
+    const usedTs = new Date(uc.usedAt!).getTime();
+    return usedTs < cutoff;
+  });
+}
+
+// /shop/[id] 위젯 — 업소명 매칭 인증 후기 (역방향 노출)
+export function getCertifiedReviewsForShop(shopName: string, limit = 6): ReviewData[] {
+  return loadReviews()
+    .filter((r) => r.isCertified && r.shopName === shopName && !r.deletedAt)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, limit);
+}
+
 export function getShopCouponStats(ownerUserId: number): Array<CouponData & { claimCount: number; usedCount: number }> {
   const coupons = loadCoupons().filter((c) => c.ownerUserId === ownerUserId);
   const ucs = loadUserCoupons();
@@ -987,6 +1136,8 @@ const DEFAULT_SETTINGS: SiteSettings = {
   pointAttendStreakBonus: 10,
   pointPost: 20,
   pointComment: 5,
+  pointReview: 100,
+  pointCertifiedReview: 500,
   boardPermissions: {
     read:  { guest: true,  user: true,  shop: true  },
     write: { guest: false, user: true,  shop: true  },

@@ -1,7 +1,14 @@
 import { auth } from "@/auth";
+import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getUserById, getPointLogs, getTodayAttendance, getUserCoupons, couponLabel } from "@/lib/data";
-import { Coins, Flame, Calendar, TrendingUp, TrendingDown, Tag, Store, Clock } from "lucide-react";
+import {
+  getUserById, getPointLogs, getTodayAttendance, getUserCoupons, couponLabel,
+  getReviews, REVIEW_DEADLINE_DAYS,
+} from "@/lib/data";
+import {
+  Coins, Flame, Calendar, TrendingUp, TrendingDown, Tag, Store,
+  PencilLine, ShieldCheck, AlertTriangle,
+} from "lucide-react";
 import MyCouponCode from "./MyCouponCode";
 
 const ACTION_LABELS: Record<string, string> = {
@@ -25,6 +32,26 @@ export default async function MyPage() {
   const { logs, total: totalLogs } = await getPointLogs({ userId, page: 1, pageSize: 20 });
   const todayAttend  = getTodayAttendance(userId);
   const myCoupons    = getUserCoupons(userId);
+  // 인증 후기 작성 여부 매핑 (userCouponId 기준)
+  const myReviews    = getReviews({ authorId: userId });
+  const reviewByUC   = new Map(myReviews.filter((r) => r.userCouponId).map((r) => [r.userCouponId!, r]));
+
+  // 7일 규칙 표시 — 서버 렌더 시점 1회 캡처
+  // eslint-disable-next-line react-hooks/purity -- 서버 컴포넌트에서만 호출됨
+  const nowMs = Date.now();
+  const couponRows = myCoupons.map((uc) => {
+    const used = !!uc.usedAt;
+    const review = used ? reviewByUC.get(uc.id) : undefined;
+    const daysSinceUsed = used
+      ? Math.floor((nowMs - new Date(uc.usedAt!).getTime()) / 86400_000)
+      : 0;
+    const daysLeft = REVIEW_DEADLINE_DAYS - daysSinceUsed;
+    return {
+      uc, used, review, daysLeft,
+      overdue:      used && !review && daysLeft <= 0,
+      expiringSoon: used && !review && daysLeft > 0 && daysLeft <= 2,
+    };
+  });
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
@@ -96,37 +123,77 @@ export default async function MyPage() {
             <span className="text-xs text-gray-400">{myCoupons.length}장</span>
           </div>
           <div className="space-y-2">
-            {myCoupons.map((uc) => (
-              <div key={uc.id} className={`flex items-center gap-3 p-3 rounded-lg border ${uc.usedAt ? "bg-gray-50 border-gray-100 opacity-60" : "bg-green-50 border-green-100"}`}>
-                <div className="shrink-0 w-10 h-10 bg-gradient-to-br from-green-400 to-emerald-500 rounded-lg flex items-center justify-center text-white">
-                  <Tag size={14} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-800 truncate">{uc.coupon.title}</p>
-                  <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5">
-                    <span className="font-semibold text-green-600">{couponLabel(uc.coupon)}</span>
-                    {uc.coupon.shopName && (
-                      <span className="flex items-center gap-0.5"><Store size={10} />{uc.coupon.shopName}</span>
-                    )}
-                    {uc.coupon.validUntil && (
-                      <span className="flex items-center gap-0.5"><Clock size={10} />{uc.coupon.validUntil}까지</span>
+            {couponRows.map(({ uc, used, review, daysLeft, overdue, expiringSoon }) => {
+              return (
+                <div key={uc.id} className={`flex items-center gap-3 p-3 rounded-lg border ${
+                  overdue
+                    ? "bg-red-50 border-red-200"
+                    : used && !review
+                      ? "bg-amber-50 border-amber-200"
+                      : used
+                        ? "bg-gray-50 border-gray-100 opacity-70"
+                        : "bg-green-50 border-green-100"
+                }`}>
+                  <div className="shrink-0 w-10 h-10 bg-gradient-to-br from-green-400 to-emerald-500 rounded-lg flex items-center justify-center text-white">
+                    <Tag size={14} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-medium text-gray-800 truncate">{uc.coupon.title}</p>
+                      {review && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 bg-yellow-400/20 text-yellow-700 rounded-full font-bold">
+                          <ShieldCheck size={9} /> 인증완료
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5 flex-wrap">
+                      <span className="font-semibold text-green-600">{couponLabel(uc.coupon)}</span>
+                      {uc.coupon.shopName && (
+                        <span className="flex items-center gap-0.5"><Store size={10} />{uc.coupon.shopName}</span>
+                      )}
+                      {used && (
+                        <span className="text-gray-500">사용 {uc.usedAt}</span>
+                      )}
+                      {overdue && (
+                        <span className="flex items-center gap-0.5 text-red-600 font-semibold">
+                          <AlertTriangle size={10} /> 후기 미작성 — 신규 발급 차단됨
+                        </span>
+                      )}
+                      {expiringSoon && (
+                        <span className="flex items-center gap-0.5 text-amber-700 font-semibold">
+                          <AlertTriangle size={10} /> 후기 작성 마감 D-{daysLeft}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    {used && review ? (
+                      <Link
+                        href={`/reviews/${review.id}`}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-yellow-400 text-[#1a1a2e] rounded-lg text-xs font-bold hover:bg-yellow-300 transition-colors"
+                      >
+                        <ShieldCheck size={11} /> 후기 보기
+                      </Link>
+                    ) : used ? (
+                      <Link
+                        href={`/reviews/new?userCouponId=${uc.id}`}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-yellow-400 to-orange-500 text-[#1a1a2e] rounded-lg text-xs font-bold hover:shadow-md transition-shadow"
+                      >
+                        <PencilLine size={11} /> 후기 쓰기
+                      </Link>
+                    ) : uc.reservationCode ? (
+                      <MyCouponCode code={uc.reservationCode} />
+                    ) : (
+                      <span className="text-xs text-gray-400">코드 없음</span>
                     )}
                   </div>
                 </div>
-                <div className="shrink-0 text-right">
-                  {uc.usedAt ? (
-                    <span className="text-xs text-gray-400">사용완료<br />{uc.usedAt}</span>
-                  ) : uc.reservationCode ? (
-                    <MyCouponCode code={uc.reservationCode} />
-                  ) : (
-                    <span className="text-xs text-gray-400">코드 없음</span>
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           <p className="text-[11px] text-gray-400 mt-3">
-            * 쿠폰 사용은 업소에서 [사용 확인] 처리해야 완료됩니다. 매장에 위 예약 코드 또는 닉네임을 보여주세요.
+            * 쿠폰 사용 후 {REVIEW_DEADLINE_DAYS}일 이내에 인증 후기를 작성하지 않으면 신규 쿠폰 발급이 제한됩니다.
+            인증 후기는 일반 후기보다 포인트가 더 많이 지급됩니다.
           </p>
         </div>
       )}

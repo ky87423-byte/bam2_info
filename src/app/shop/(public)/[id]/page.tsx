@@ -11,6 +11,7 @@ import ContactButtons from "./ContactButtons";
 import ClaimListingBanner from "@/components/shop/ClaimListingBanner";
 import InquiryButton from "@/components/shop/InquiryButton";
 import CommentSection from "@/components/comments/CommentSection";
+import CertifiedReviewsWidget from "@/components/reviews/CertifiedReviewsWidget";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -135,6 +136,9 @@ export default async function ShopDetailPage({ params }: Props) {
           </div>
         )}
       </div>
+
+      {/* 인증 후기 위젯 — 같은 shopName 매칭 */}
+      <CertifiedReviewsWidget shopName={shop.company} />
 
       {/* 댓글 섹션 — targetType="shop" 으로 /posts 의 promotion 댓글과 분리 */}
       <CommentSection boardType="shop" postId={shop.id} />
