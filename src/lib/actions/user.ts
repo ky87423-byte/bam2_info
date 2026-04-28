@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { updateUser, deleteUser } from "@/lib/data";
+import { isAdminSession } from "./_authGuards";
 
 export async function actionUpdateUser(formData: FormData) {
+  if (!(await isAdminSession())) return;
   const id = parseInt(formData.get("id") as string, 10);
   if (!id) return;
 
@@ -35,11 +37,13 @@ export async function actionUpdateUser(formData: FormData) {
 }
 
 export async function actionDeleteUser(id: number) {
+  if (!(await isAdminSession())) return;
   await deleteUser(id);
   revalidatePath("/admin/users");
 }
 
 export async function actionToggleUserStatus(id: number, status: "active" | "blocked") {
+  if (!(await isAdminSession())) return;
   await updateUser(id, { status });
   revalidatePath("/admin/users");
   revalidatePath(`/admin/users/${id}`);

@@ -110,7 +110,12 @@ export default function BoardManager({ initialNotices }: { initialNotices: Notic
                   </td>
                   <td className="px-4 py-3 text-center">
                     {notice.isPinned ? (
-                      <span className="text-xs bg-yellow-50 text-yellow-600 px-2 py-0.5 rounded-full">고정</span>
+                      <div className="inline-flex flex-col items-center gap-0.5">
+                        <span className="text-xs bg-yellow-50 text-yellow-700 px-2 py-0.5 rounded-full">📌 고정</span>
+                        {notice.boardCategory === "free" && <span className="text-[10px] text-yellow-700">자유게시판</span>}
+                        {notice.boardCategory === "jobs" && <span className="text-[10px] text-yellow-700">구인구직</span>}
+                        {!notice.boardCategory && <span className="text-[10px] text-gray-400">미배정</span>}
+                      </div>
                     ) : (
                       <span className="text-gray-300 text-xs">-</span>
                     )}
@@ -190,6 +195,21 @@ function NoticeForm({
           placeholder="공지 내용을 입력하세요"
           className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-400 resize-none"
         />
+      </div>
+      <div>
+        <label className="text-xs text-gray-500 block mb-1">고정 게시판</label>
+        <select
+          name="boardCategory"
+          defaultValue={notice?.boardCategory ?? ""}
+          className="w-full sm:w-60 border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-blue-400"
+        >
+          <option value="">선택 안 함 (게시판 표시 안 됨)</option>
+          <option value="free">자유게시판</option>
+          <option value="jobs">구인구직</option>
+        </select>
+        <p className="mt-1 text-[11px] text-gray-400">
+          선택한 게시판 상단에 📌 핀 공지로 노출됩니다. (상단 고정 체크 + 노출 ON 필수)
+        </p>
       </div>
       <div className="flex items-center gap-6">
         <label className="flex items-center gap-2 cursor-pointer">

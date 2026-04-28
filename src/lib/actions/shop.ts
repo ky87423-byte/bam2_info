@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { updateShop, deleteShop, toggleShopVisibility } from "@/lib/data";
+import { isAdminSession } from "./_authGuards";
 
 export async function actionUpdateShop(formData: FormData) {
+  if (!(await isAdminSession())) return;
   const id = parseInt(formData.get("id") as string, 10);
   if (!id) return;
 
@@ -28,11 +30,13 @@ export async function actionUpdateShop(formData: FormData) {
 }
 
 export async function actionDeleteShop(id: number) {
+  if (!(await isAdminSession())) return;
   deleteShop(id);
   revalidatePath("/admin/shops");
 }
 
 export async function actionToggleShopVisibility(id: number) {
+  if (!(await isAdminSession())) return;
   toggleShopVisibility(id);
   revalidatePath("/admin/shops");
   revalidatePath(`/admin/shops/${id}`);

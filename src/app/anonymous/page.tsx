@@ -2,6 +2,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { Eye, EyeOff, MessageCircle, PlusCircle, UserCircle, LogIn } from "lucide-react";
 import { getBoardPosts } from "@/lib/actions/boardPost";
+import Breadcrumb from "@/components/Breadcrumb";
 
 const PAGE_SIZE = 20;
 const CATEGORY  = "anonymous";
@@ -21,6 +22,8 @@ export default async function AnonymousListPage({ searchParams }: Props) {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
+      <Breadcrumb items={[{ label: "커뮤니티" }, { label: "익명게시판" }]} />
+
       {/* 헤더 */}
       <div className="flex items-center justify-between mb-6 gap-3">
         <div className="flex items-center gap-2 min-w-0">

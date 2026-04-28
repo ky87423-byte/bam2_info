@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Search, Ticket, ShieldCheck } from "lucide-react";
+import { Search } from "lucide-react";
 import { auth } from "@/auth";
 import { logoutAction } from "@/lib/actions/auth";
 import { getUserById, getSettings } from "@/lib/data";
@@ -20,7 +20,7 @@ export default async function Header() {
 
   return (
     <header className="bg-[#1a1a2e] text-white sticky top-0 z-50 shadow-lg">
-      <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-3 md:gap-4">
+      <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-3 lg:gap-4">
         <Link href="/" className="text-xl font-bold text-yellow-400 shrink-0">
           BAM
         </Link>
@@ -40,25 +40,14 @@ export default async function Header() {
           </div>
         </form>
 
-        {/* 빠른 액션 2종 — 노란/오렌지 그라데이션, sm 이상에서만 노출 (모바일은 햄버거 메뉴에 들어감) */}
-        <div className="hidden sm:flex items-center gap-1.5 shrink-0">
-          <Link
-            href="/coupons"
-            aria-label="쿠폰 수령"
-            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-gradient-to-r from-yellow-400 to-orange-500 text-[#1a1a2e] text-xs font-bold shadow-md hover:shadow-lg hover:from-yellow-300 hover:to-orange-400 transition-all ring-1 ring-yellow-300/40"
-          >
-            <Ticket size={14} className="shrink-0" />
-            <span className="whitespace-nowrap">🎟️ 쿠폰수령</span>
-          </Link>
-          <Link
-            href="/reviews"
-            aria-label="인증 후기 게시판"
-            className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs font-bold shadow-md hover:shadow-lg hover:from-orange-400 hover:to-red-400 transition-all ring-1 ring-orange-400/40"
-          >
-            <ShieldCheck size={14} className="shrink-0" />
-            <span className="whitespace-nowrap">📝 인증후기</span>
-          </Link>
-        </div>
+        {/* 퀵 버튼 — 쿠폰수령만 (인증후기는 커뮤니티 드롭다운으로 이동) */}
+        <Link
+          href="/coupons"
+          aria-label="쿠폰"
+          className="hidden sm:inline-flex items-center h-8 px-2.5 rounded-md bg-yellow-400 text-[#1a1a2e] text-[11px] font-semibold shadow-sm hover:bg-yellow-300 transition-colors whitespace-nowrap shrink-0"
+        >
+          🎟️ 쿠폰
+        </Link>
 
         <HeaderNav
           user={user ? {

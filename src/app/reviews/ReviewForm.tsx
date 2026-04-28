@@ -14,8 +14,8 @@ type Mode = "general" | "certified" | "edit";
 
 interface Props {
   mode: Mode;
-  fixedShopName?: string;       // certified 모드에서 고정
-  fixedBizType?: string;        // certified 모드에서 고정
+  fixedShopName?: string;
+  fixedBizType?: string;
   userCouponId?: number | null;
   bizTypes: string[];
   tagPresets: string[];
@@ -108,8 +108,8 @@ export default function ReviewForm({
       <Section title="업소 정보">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="text-xs text-white/60 block mb-1 flex items-center gap-1">
-              업소명 {lockShop && <Lock size={10} className="text-yellow-400" />}
+            <label className="text-xs text-gray-500 mb-1 flex items-center gap-1">
+              업소명 {lockShop && <Lock size={10} className="text-orange-500" />}
             </label>
             <input
               type="text" name="shopName"
@@ -119,14 +119,14 @@ export default function ReviewForm({
               placeholder="방문하신 업소명"
               className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none ${
                 lockShop
-                  ? "bg-yellow-400/10 border-yellow-400/40 text-yellow-200 cursor-not-allowed"
-                  : "bg-white/5 border-white/10 text-white focus:border-yellow-400"
+                  ? "bg-orange-50 border-orange-200 text-orange-700 cursor-not-allowed"
+                  : "bg-white border-gray-200 text-gray-800 focus:border-yellow-400"
               }`}
             />
           </div>
           <div>
-            <label className="text-xs text-white/60 block mb-1 flex items-center gap-1">
-              업종 (말머리) {lockShop && <Lock size={10} className="text-yellow-400" />}
+            <label className="text-xs text-gray-500 mb-1 flex items-center gap-1">
+              업종 (말머리) {lockShop && <Lock size={10} className="text-orange-500" />}
             </label>
             {lockShop ? (
               <>
@@ -134,22 +134,22 @@ export default function ReviewForm({
                 <input
                   type="text" readOnly
                   value={fixedBizType || defaultValues.bizType || ""}
-                  className="w-full bg-yellow-400/10 border border-yellow-400/40 text-yellow-200 rounded-lg px-3 py-2 text-sm cursor-not-allowed"
+                  className="w-full bg-orange-50 border border-orange-200 text-orange-700 rounded-lg px-3 py-2 text-sm cursor-not-allowed"
                 />
               </>
             ) : (
               <select
                 name="bizType" defaultValue={defaultValues.bizType ?? ""} required
-                className="w-full bg-white/5 border border-white/10 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-yellow-400"
+                className="w-full bg-white border border-gray-200 text-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-yellow-400"
               >
                 <option value="" disabled>업종 선택</option>
-                {bizTypes.map((b) => <option key={b} value={b} className="bg-[#1a1a2e]">{b}</option>)}
+                {bizTypes.map((b) => <option key={b} value={b}>{b}</option>)}
               </select>
             )}
           </div>
         </div>
         {isCertified && (
-          <p className="mt-2 text-[11px] text-yellow-400/80 flex items-center gap-1">
+          <p className="mt-2 text-[11px] text-orange-600 flex items-center gap-1">
             <ShieldCheck size={11} /> 사용 확인된 쿠폰 정보로 자동 입력되었습니다.
           </p>
         )}
@@ -159,27 +159,27 @@ export default function ReviewForm({
       <Section title="후기">
         <div className="space-y-3">
           <div>
-            <label className="text-xs text-white/60 block mb-1">제목</label>
+            <label className="text-xs text-gray-500 block mb-1">제목</label>
             <input
               type="text" name="title" required maxLength={80}
               defaultValue={defaultValues.title}
               placeholder="예: 친절하고 깔끔한 매장입니다"
-              className="w-full bg-white/5 border border-white/10 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-yellow-400"
+              className="w-full bg-white border border-gray-200 text-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-yellow-400"
             />
           </div>
           <div>
-            <label className="text-xs text-white/60 block mb-1">본문</label>
+            <label className="text-xs text-gray-500 block mb-1">본문</label>
             <textarea
               name="content" required rows={8} maxLength={5000}
               defaultValue={defaultValues.content}
               placeholder="실제 경험을 자세히 적어주세요. (10자 이상)"
-              className="w-full bg-white/5 border border-white/10 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-yellow-400 resize-y"
+              className="w-full bg-white border border-gray-200 text-gray-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-yellow-400 resize-y"
             />
           </div>
         </div>
       </Section>
 
-      {/* 별점 — 3축 */}
+      {/* 별점 */}
       <Section title="상세 평가">
         <div className="space-y-3">
           <RatingRow label="시설"   value={rFac} onChange={setRFac} />
@@ -197,8 +197,8 @@ export default function ReviewForm({
               <label key={t}
                 className={`px-3 py-1.5 rounded-full text-xs font-medium cursor-pointer border transition-colors ${
                   active
-                    ? "bg-yellow-400 text-[#1a1a2e] border-yellow-400"
-                    : "bg-white/5 text-white/70 border-white/10 hover:bg-white/10"
+                    ? "bg-yellow-400 text-black border-yellow-400 shadow-sm"
+                    : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
                 }`}
               >
                 <input
@@ -223,12 +223,12 @@ export default function ReviewForm({
                   <img src={url} alt="" className="w-full h-full object-cover rounded-lg" />
                   {mainPhoto === url && (
                     <div className="absolute top-1 left-1 bg-yellow-400 rounded-full p-0.5">
-                      <Star size={10} className="text-[#1a1a2e] fill-[#1a1a2e]" />
+                      <Star size={10} className="text-white fill-white" />
                     </div>
                   )}
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-1">
                     <button type="button" onClick={() => setMain(url)}
-                      className="p-1 bg-yellow-400 rounded-full text-[#1a1a2e] hover:bg-yellow-300">
+                      className="p-1 bg-yellow-400 rounded-full text-black hover:bg-yellow-500">
                       <Star size={11} />
                     </button>
                     <button type="button" onClick={() => removePhoto(url)}
@@ -246,7 +246,7 @@ export default function ReviewForm({
                 onChange={handleFileChange} className="hidden" id="reviewPhotoInput" />
               <label
                 htmlFor="reviewPhotoInput"
-                className={`flex items-center gap-2 px-4 py-2.5 border-2 border-dashed border-white/20 rounded-lg text-sm text-white/60 cursor-pointer hover:border-yellow-400 hover:text-yellow-400 transition-colors w-fit ${uploading ? "opacity-50 pointer-events-none" : ""}`}
+                className={`flex items-center gap-2 px-4 py-2.5 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 cursor-pointer hover:border-yellow-400 hover:text-yellow-600 transition-colors w-fit ${uploading ? "opacity-50 pointer-events-none" : ""}`}
               >
                 {uploading ? <Loader2 size={16} className="animate-spin" /> : <ImagePlus size={16} />}
                 {uploading ? "업로드 중..." : `사진 추가 (최대 ${MAX_PHOTOS}장)`}
@@ -257,21 +257,21 @@ export default function ReviewForm({
       </Section>
 
       {error && (
-        <div className="bg-red-500/15 border border-red-500/40 text-red-300 text-sm px-4 py-3 rounded-lg">
+        <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-lg">
           {error}
         </div>
       )}
 
       <div className="flex items-center justify-end gap-2 pt-2">
         <button type="button" onClick={() => router.push("/reviews")}
-          className="px-5 py-2 bg-white/10 text-white/70 rounded-lg text-sm hover:bg-white/20 transition-colors">
+          className="px-5 py-2 bg-white border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition-colors">
           취소
         </button>
         <button type="submit" disabled={pending || uploading}
-          className={`px-6 py-2 rounded-lg text-sm font-bold transition-all disabled:opacity-50 ${
+          className={`px-6 py-2 rounded-lg text-sm font-bold transition-all disabled:opacity-50 shadow-sm ${
             isCertified
-              ? "bg-gradient-to-r from-yellow-400 to-orange-500 text-[#1a1a2e] hover:shadow-lg"
-              : "bg-yellow-400 text-[#1a1a2e] hover:bg-yellow-300"
+              ? "bg-orange-500 text-white hover:bg-orange-600"
+              : "bg-yellow-400 text-black hover:bg-yellow-500"
           }`}>
           {pending ? "저장 중..." : isEdit ? "수정 완료" : isCertified ? "인증 후기 등록" : "후기 등록"}
         </button>
@@ -282,8 +282,8 @@ export default function ReviewForm({
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white/5 border border-white/10 rounded-xl p-5">
-      <h3 className="font-bold text-white/80 mb-4 pb-2 border-b border-white/10 text-sm">{title}</h3>
+    <div className="bg-white rounded-2xl shadow-sm p-5">
+      <h3 className="font-bold text-gray-700 mb-4 pb-2 border-b border-gray-100 text-sm">{title}</h3>
       {children}
     </div>
   );
@@ -292,7 +292,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function RatingRow({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="text-sm text-white/70 w-14 shrink-0">{label}</span>
+      <span className="text-sm text-gray-600 w-14 shrink-0">{label}</span>
       <div className="flex items-center gap-1">
         {[1, 2, 3, 4, 5].map((i) => (
           <button
@@ -301,12 +301,12 @@ function RatingRow({ label, value, onChange }: { label: string; value: number; o
           >
             <Star
               size={20}
-              className={i <= value ? "fill-yellow-400 text-yellow-400" : "text-white/20 hover:text-white/40"}
+              className={i <= value ? "fill-yellow-400 text-yellow-400" : "text-gray-200 hover:text-gray-300"}
             />
           </button>
         ))}
       </div>
-      <span className="text-sm font-bold text-yellow-400 ml-2">{value}.0</span>
+      <span className="text-sm font-bold text-yellow-600 ml-2">{value}.0</span>
     </div>
   );
 }

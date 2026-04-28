@@ -23,6 +23,8 @@ function canPostInCategory(role: string | undefined, category: string): boolean 
 function basePath(category: string): string {
   if (category === "shop_only") return "/shop-community";
   if (category === "anonymous") return "/anonymous";
+  if (category === "jobs")      return "/jobs";
+  if (category === "free")      return "/free";
   return "/posts";   // 미래 확장
 }
 

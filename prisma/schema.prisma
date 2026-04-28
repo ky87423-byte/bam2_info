@@ -195,6 +195,7 @@ model PointLog {
 
   @@index([userId, createdAt])
   @@index([createdAt])
+  @@index([action, createdAt])         // admin 분석: 후기/쿠폰/출석 등 action별 시계열 집계
 }
 
 // ── Comment (무한 확장형 polymorphic) ────────────────────────────────────────

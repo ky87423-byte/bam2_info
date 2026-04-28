@@ -24,31 +24,27 @@ export default async function EditReviewPage({ params }: Props) {
   const isAdmin = session.user.role === "admin";
   if (review.authorId !== userId && !isAdmin) {
     return (
-      <div className="bg-[#0e0e1a] min-h-screen text-white">
-        <div className="max-w-3xl mx-auto px-4 py-16 text-center">
-          <p className="text-white/60">본인의 후기만 수정할 수 있습니다.</p>
-        </div>
+      <div className="max-w-3xl mx-auto px-4 py-16 text-center">
+        <p className="text-gray-500">본인의 후기만 수정할 수 있습니다.</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-[#0e0e1a] min-h-screen text-white">
-      <div className="max-w-3xl mx-auto px-4 py-8">
-        <Link href={`/reviews/${review.id}`} className="inline-flex items-center gap-1 text-sm text-white/60 hover:text-yellow-400 mb-4">
-          <ChevronLeft size={14} /> 후기 보기
-        </Link>
-        <div className="mb-6 flex items-center gap-3">
-          <Pencil size={22} className="text-yellow-400" />
-          <h1 className="text-xl font-bold text-yellow-400">후기 수정</h1>
-        </div>
-        <ReviewForm
-          mode="edit"
-          bizTypes={[...REVIEW_BIZ_TYPES]}
-          tagPresets={[...REVIEW_TAG_PRESET]}
-          defaultValues={review}
-        />
+    <div className="max-w-3xl mx-auto px-4 py-8">
+      <Link href={`/reviews/${review.id}`} className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-yellow-600 mb-4">
+        <ChevronLeft size={14} /> 후기 보기
+      </Link>
+      <div className="mb-6 flex items-center gap-3">
+        <Pencil size={22} className="text-yellow-600" />
+        <h1 className="text-xl font-bold text-gray-800">후기 수정</h1>
       </div>
+      <ReviewForm
+        mode="edit"
+        bizTypes={[...REVIEW_BIZ_TYPES]}
+        tagPresets={[...REVIEW_TAG_PRESET]}
+        defaultValues={review}
+      />
     </div>
   );
 }

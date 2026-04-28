@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { saveSettings } from "@/lib/data";
+import { isAdminSession } from "./_authGuards";
 
 export async function actionSaveSettings(formData: FormData) {
+  if (!(await isAdminSession())) return;
   saveSettings({
     siteName: formData.get("siteName") as string,
     siteDescription: formData.get("siteDescription") as string,

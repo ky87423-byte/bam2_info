@@ -170,14 +170,14 @@ export default async function MyPage() {
                     {used && review ? (
                       <Link
                         href={`/reviews/${review.id}`}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-yellow-400 text-[#1a1a2e] rounded-lg text-xs font-bold hover:bg-yellow-300 transition-colors"
+                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-yellow-300 text-yellow-700 rounded-lg text-xs font-semibold hover:bg-yellow-50 transition-colors"
                       >
-                        <ShieldCheck size={11} /> 후기 보기
+                        <ShieldCheck size={11} className="text-orange-500" /> 후기 보기
                       </Link>
                     ) : used ? (
                       <Link
                         href={`/reviews/new?userCouponId=${uc.id}`}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-yellow-400 to-orange-500 text-[#1a1a2e] rounded-lg text-xs font-bold hover:shadow-md transition-shadow"
+                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-yellow-400 text-black rounded-lg text-xs font-semibold hover:bg-yellow-500 shadow-sm transition-colors"
                       >
                         <PencilLine size={11} /> 후기 쓰기
                       </Link>

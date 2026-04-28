@@ -9,6 +9,7 @@ import {
 } from "@/lib/data";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { requireAdmin, isAdminSession } from "./_authGuards";
 
 function parseCouponForm(formData: FormData) {
   const shopIdRaw          = formData.get("shopId") as string;
@@ -75,12 +76,15 @@ function validateCouponInput(input: ReturnType<typeof parseCouponForm>): string 
 }
 
 export async function actionSaveMenuVisibility(couponVisible: boolean, eventVisible: boolean) {
+  if (!(await isAdminSession())) return;
   saveSettings({ menuCouponVisible: couponVisible, menuEventVisible: eventVisible });
   revalidatePath("/", "layout");
   revalidatePath("/admin/coupons");
 }
 
 export async function actionCreateCoupon(formData: FormData) {
+  const guard = await requireAdmin();
+  if (!guard.ok) return { error: guard.error };
   const input = parseCouponForm(formData);
   const err = validateCouponInput(input);
   if (err) return { error: err };
@@ -91,6 +95,8 @@ export async function actionCreateCoupon(formData: FormData) {
 }
 
 export async function actionUpdateCoupon(formData: FormData) {
+  const guard = await requireAdmin();
+  if (!guard.ok) return { error: guard.error };
   const id = parseInt(formData.get("id") as string, 10);
   if (!id) return { error: "잘못된 요청입니다." };
   const input = parseCouponForm(formData);
@@ -103,12 +109,14 @@ export async function actionUpdateCoupon(formData: FormData) {
 }
 
 export async function actionToggleCouponActive(id: number, isActive: boolean) {
+  if (!(await isAdminSession())) return;
   updateCoupon(id, { isActive });
   revalidatePath("/admin/coupons");
   revalidatePath("/coupons");
 }
 
 export async function actionDeleteCoupon(id: number) {
+  if (!(await isAdminSession())) return;
   deleteCoupon(id);
   revalidatePath("/admin/coupons");
   revalidatePath("/coupons");

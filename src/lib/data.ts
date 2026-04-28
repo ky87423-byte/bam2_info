@@ -217,6 +217,15 @@ export interface NoticeData {
   isPinned: boolean;
   isVisible: boolean;
   createdAt: string;
+  // 어느 게시판에 고정할지 — "" 또는 미지정 시 전역(현재는 표시 안 함), "free" / "jobs" 만 지원
+  boardCategory?: "" | "free" | "jobs";
+}
+
+// 특정 게시판에서 노출할 핀 공지 — isPinned + isVisible + 카테고리 일치
+export function getPinnedNoticesForBoard(category: "free" | "jobs"): NoticeData[] {
+  return loadNotices()
+    .filter((n) => n.isPinned && n.isVisible && n.boardCategory === category)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export interface BoardPermissionSet {
