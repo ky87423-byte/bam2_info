@@ -12,6 +12,7 @@ try { require('dotenv').config({ path: path.join(__dirname, '..', '.env') }); } 
 const puppeteer = require('puppeteer');
 const fs   = require('fs');
 const url_mod = require('url');
+const { toWebP } = require('./lib/webp-convert');
 
 // ── 설정 ──────────────────────────────────────────────────────────
 const CFG = {
@@ -60,9 +61,26 @@ function loadDone() {
     return new Set(fs.readFileSync(DONE_FILE,'utf8').split('\n').filter(Boolean));
 }
 
-// ── 이미지 다운로드 (page fetch 실패 시 Node fetch fallback — 외부 CDN/CORS 대응) ──
-async function downloadImageWithPage(page, imgUrl, destPath) {
+// ── 이미지 다운로드 + WebP 자동 변환 ─────────────────────────────────
+//   - destPath 는 .webp 확장자로 전달됨 (호출 측에서 toWebPFilename 처리)
+//   - 다운로드 받은 원본을 메모리에서 WebP 로 변환 후 저장 (디스크 70%+ 절감)
+//   - 변환 실패 시 원본 그대로 저장 (드물지만 손상 이미지 등)
+async function downloadImageWithPage(page, imgUrl, destPath, originalExt) {
     if (fs.existsSync(destPath)) return true;
+
+    async function saveAsWebP(rawBuf) {
+        try {
+            const { buffer } = await toWebP(rawBuf, originalExt);
+            fs.writeFileSync(destPath, buffer);
+            return true;
+        } catch (e) {
+            // 변환 실패 → 원본 그대로 저장 (확장자는 destPath의 .webp 그대로지만 데이터는 원본)
+            // 매우 드문 케이스. 추후 bulk-convert-to-webp.js 로 재변환 가능.
+            fs.writeFileSync(destPath, rawBuf);
+            return true;
+        }
+    }
+
     // 1) 페이지 컨텍스트 fetch (same-origin 일 때)
     try {
         const result = await page.evaluate(async (url) => {
@@ -74,8 +92,7 @@ async function downloadImageWithPage(page, imgUrl, destPath) {
             } catch(e) { return { ok: false, reason: e.message }; }
         }, imgUrl);
         if (result.ok) {
-            fs.writeFileSync(destPath, Buffer.from(result.data));
-            return true;
+            return await saveAsWebP(Buffer.from(result.data));
         }
     } catch (e) { /* 다음 단계로 */ }
 
@@ -93,8 +110,7 @@ async function downloadImageWithPage(page, imgUrl, destPath) {
         if (!res.ok) return false;
         const buf = Buffer.from(await res.arrayBuffer());
         if (buf.length < 1000) return false;   // 1KB 미만 = placeholder/에러
-        fs.writeFileSync(destPath, buf);
-        return true;
+        return await saveAsWebP(buf);
     } catch (e) {
         return false;
     }
@@ -295,14 +311,15 @@ async function scrapeDetail(page, item, idx) {
     const area      = titleArea ? `${titleArea},` : '';
     const subject   = raw.title.replace(/^\[[^\]]+\]\s*/, '').substring(0, 200);
 
-    // 이미지 다운로드 (Puppeteer fetch)
+    // 이미지 다운로드 + WebP 자동 변환 (저장은 항상 .webp 로)
     const savedPaths = [];
     for (let i = 0; i < raw.imgUrls.length; i++) {
-        const imgUrl = raw.imgUrls[i];
-        const ext    = (imgUrl.match(/\.(gif|jpg|jpeg|png|webp)/i) || ['.jpg'])[0].toLowerCase();
-        const fname  = `${item.wr_id}_${i + 1}${ext}`;
-        const dest   = path.join(CFG.imageDir, fname);
-        const ok     = await downloadImageWithPage(page, imgUrl, dest);
+        const imgUrl     = raw.imgUrls[i];
+        const extMatch   = imgUrl.match(/\.(gif|jpg|jpeg|png|webp)/i);
+        const originalExt = (extMatch ? extMatch[1] : 'jpg').toLowerCase();
+        const fname      = `${item.wr_id}_${i + 1}.webp`;        // 항상 .webp 로 저장
+        const dest       = path.join(CFG.imageDir, fname);
+        const ok         = await downloadImageWithPage(page, imgUrl, dest, originalExt);
         if (ok) savedPaths.push(`/images/imgs/${fname}`);
     }
 

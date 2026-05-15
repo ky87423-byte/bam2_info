@@ -7,12 +7,31 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { ensureVirtualUserForShop } from "@/lib/virtualUsers";
 
-const SHOPS_PATH = path.join(process.cwd(), "scraper", "scraped_data", "shops.json");
-const URLS_PATH  = path.join(process.cwd(), "scraper", "scraped_data", "urls.json");
+const SHOPS_PATH       = path.join(process.cwd(), "scraper", "scraped_data", "shops.json");
+const URLS_PATH        = path.join(process.cwd(), "scraper", "scraped_data", "urls.json");
+const SHOP_STATUS_PATH = path.join(process.cwd(), "data", "shop_status.json");
+const DATA_DIR         = path.join(process.cwd(), "data");
 
 // 미관측 → 상태 전환 임계값
 const ARCHIVE_AFTER_DAYS    = 30;   // 30일 + 3회 이상 미관측 → ARCHIVED
 const ARCHIVE_AFTER_STREAK  = 3;
+
+// ── shop_status.json: 공개 페이지 필터링용 ─────────────────────────────
+// DB Shop.externalId → sourceStatus 매핑을 JSON 으로 export.
+// data.ts(loadShops) 가 sync 하게 읽어 DELETED_CONFIRMED / ARCHIVED 를 숨김.
+async function writeShopStatusJson(): Promise<number> {
+  const rows = await prisma.shop.findMany({
+    where:  { isScraped: true, externalId: { not: null } },
+    select: { externalId: true, sourceStatus: true },
+  });
+  const map: Record<string, string> = {};
+  for (const r of rows) {
+    if (r.externalId != null) map[String(r.externalId)] = r.sourceStatus;
+  }
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.writeFileSync(SHOP_STATUS_PATH, JSON.stringify(map));
+  return rows.length;
+}
 
 // shops.json 의 row 구조 (스크래퍼 출력)
 interface ScrapedRow {
@@ -158,6 +177,7 @@ export interface VisibilitySyncResult {
   seenUpdated:      number;   // ACTIVE 로 갱신된 Shop 수
   missingIncreased: number;   // missingStreak +1 된 Shop 수
   archived:         number;   // ARCHIVED 로 전환된 Shop 수
+  statusJsonCount:  number;   // shop_status.json 에 기록된 externalId 수
   durationMs:       number;
 }
 
@@ -220,7 +240,11 @@ export async function syncListVisibilityAction(): Promise<VisibilitySyncActionRe
     data: { sourceStatus: "ARCHIVED" },
   });
 
+  // 5) shop_status.json 갱신 (공개 페이지가 이걸 읽어 DELETED_CONFIRMED/ARCHIVED 숨김)
+  const statusJsonCount = await writeShopStatusJson();
+
   revalidatePath("/admin/sync");
+  revalidatePath("/");          // 공개 목록 캐시 무효화
 
   return {
     ok: true,
@@ -228,6 +252,7 @@ export async function syncListVisibilityAction(): Promise<VisibilitySyncActionRe
     seenUpdated:      seenUpdate.count,
     missingIncreased: Number(missingResult),
     archived:         archived.count,
+    statusJsonCount,
     durationMs:       Date.now() - t0,
   };
 }

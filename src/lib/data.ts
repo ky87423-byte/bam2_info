@@ -6,6 +6,9 @@ import { UserRole, UserStatus, PointAction as DbPointAction } from "@/generated/
 
 const SHOPS_PATH       = path.join(process.cwd(), "scraper", "scraped_data", "shops.json");
 const OVERRIDE_PATH    = path.join(process.cwd(), "data", "shop_overrides.json");
+const SHOP_STATUS_PATH = path.join(process.cwd(), "data", "shop_status.json");
+// 공개 페이지에서 숨길 sourceStatus 값
+const HIDDEN_STATUSES = new Set(["DELETED_CONFIRMED", "ARCHIVED"]);
 // USERS_PATH, POINT_LOGS_PATH 제거 — User/PointLog는 Prisma DB로 이관됨
 const SETTINGS_PATH    = path.join(process.cwd(), "data", "settings.json");
 const COUPONS_PATH     = path.join(process.cwd(), "data", "coupons.json");
@@ -280,11 +283,13 @@ type RawShop = {
   phone: string; hphone: string;
   telegram: string; hit: number; price: number; mainPhoto: string;
   photos: string; time1: string; time2: string; timeFull: number; scrapedAt: string;
+  externalId?: number;   // wr_id, shop_status.json 매칭 키 (옛 데이터엔 없을 수 있음)
 };
 
-let _rawCache:       { mtime: number; data: RawShop[] } | null = null;
-let _overrideCache:  { mtime: number; data: Record<string, ShopOverride> } | null = null;
-let _shopsCache:     { rawMtime: number; ovMtime: number; data: ShopData[] } | null = null;
+let _rawCache:        { mtime: number; data: RawShop[] } | null = null;
+let _overrideCache:   { mtime: number; data: Record<string, ShopOverride> } | null = null;
+let _shopStatusCache: { mtime: number; data: Record<string, string> }      | null = null;
+let _shopsCache:      { rawMtime: number; ovMtime: number; statusMtime: number; data: ShopData[] } | null = null;
 
 function fileMtime(p: string): number {
   try { return fs.statSync(p).mtimeMs; } catch { return 0; }
@@ -297,6 +302,19 @@ function loadOverrides(): Record<string, ShopOverride> {
   try {
     const data = JSON.parse(fs.readFileSync(OVERRIDE_PATH, "utf-8"));
     _overrideCache = { mtime: m, data };
+    return data;
+  } catch { return {}; }
+}
+
+// data/shop_status.json — DB Shop.externalId → sourceStatus 매핑.
+// sync 액션 / verify-missing 스크립트가 매번 갱신. 공개 페이지 숨김에 사용.
+function loadShopStatusMap(): Record<string, string> {
+  const m = fileMtime(SHOP_STATUS_PATH);
+  if (m === 0) { _shopStatusCache = null; return {}; }
+  if (_shopStatusCache && _shopStatusCache.mtime === m) return _shopStatusCache.data;
+  try {
+    const data = JSON.parse(fs.readFileSync(SHOP_STATUS_PATH, "utf-8")) as Record<string, string>;
+    _shopStatusCache = { mtime: m, data };
     return data;
   } catch { return {}; }
 }
@@ -321,16 +339,23 @@ function loadRaw(): RawShop[] {
 }
 
 function loadShops(): ShopData[] {
-  const rawMtime = fileMtime(SHOPS_PATH);
-  const ovMtime  = fileMtime(OVERRIDE_PATH);
+  const rawMtime    = fileMtime(SHOPS_PATH);
+  const ovMtime     = fileMtime(OVERRIDE_PATH);
+  const statusMtime = fileMtime(SHOP_STATUS_PATH);
   // 우리 사이트에서 누적된 조회수 (file 원본 hit 와 합산해 표시)
   const persistedViews = getViewCounts("shop");
-  if (_shopsCache && _shopsCache.rawMtime === rawMtime && _shopsCache.ovMtime === ovMtime) {
-    // raw/override 캐시 hit — viewCounts 만 즉시 합산해서 반환 (캐시 데이터의 hit 는 file base 값)
+  if (
+    _shopsCache &&
+    _shopsCache.rawMtime === rawMtime &&
+    _shopsCache.ovMtime === ovMtime &&
+    _shopsCache.statusMtime === statusMtime
+  ) {
+    // 캐시 hit — viewCounts 만 즉시 합산해서 반환 (캐시 데이터의 hit 는 file base 값)
     return _shopsCache.data.map((s) => ({ ...s, hit: s.hit + (persistedViews[String(s.id)] ?? 0) }));
   }
-  const raw = loadRaw();
+  const raw       = loadRaw();
   const overrides = loadOverrides();
+  const statusMap = loadShopStatusMap();
 
   const result = raw
     .filter((s) => s.company)
@@ -338,6 +363,8 @@ function loadShops(): ShopData[] {
       const id = i + 1;
       const ov = overrides[String(id)] ?? {};
       if (ov.deleted) return null;
+      // 소스 사이트에서 삭제 확정 / ARCHIVED → 공개 페이지 숨김
+      if (s.externalId != null && HIDDEN_STATUSES.has(statusMap[String(s.externalId)] ?? "")) return null;
       return {
         id,
         company:   ov.company   ?? s.company,
@@ -364,7 +391,7 @@ function loadShops(): ShopData[] {
     })
     .filter(Boolean) as ShopData[];
 
-  _shopsCache = { rawMtime, ovMtime, data: result };
+  _shopsCache = { rawMtime, ovMtime, statusMtime, data: result };
   // 첫 로드도 viewCounts 합산해서 반환
   return result.map((s) => ({ ...s, hit: s.hit + (persistedViews[String(s.id)] ?? 0) }));
 }

@@ -4,7 +4,7 @@ import { getShopPosts } from "@/lib/data";
 import { prisma } from "@/lib/prisma";
 import {
   LayoutDashboard, Store, Users, Tag, MessageSquare, Mail, Inbox, ShieldCheck, RefreshCw,
-  Ticket, BarChart2, Settings, LogOut, Coins, Calendar, FileText, Trophy,
+  Ticket, BarChart2, Settings, LogOut, Coins, Calendar, FileText, Trophy, EyeOff,
 } from "lucide-react";
 import AdminPendingBadge from "./AdminPendingBadge";
 import AdminSidebarShell from "./AdminSidebarShell";
@@ -23,6 +23,7 @@ const navItems = [
   { href: "/admin/inquiries",  label: "업소 문의함",   icon: Inbox           },
   { href: "/admin/claims",     label: "소유권 신청",   icon: ShieldCheck     },
   { href: "/admin/sync",       label: "데이터 동기화", icon: RefreshCw       },
+  { href: "/admin/shops/source-status", label: "소스 상태 관리", icon: EyeOff   },
   { href: "/admin/stats",      label: "통계",          icon: BarChart2       },
   { href: "/admin/analytics", label: "분석 대시보드", icon: BarChart2       },
   { href: "/admin/settings",   label: "사이트 설정",   icon: Settings        },

@@ -53,6 +53,10 @@ next-env.d.ts
 /scraper/scraped_data/*.log
 /scraper/scraped_data/shops.json.bak.*
 /scraper/scraped_data/urls.json.bak.*
+/scraper/scraped_data/webp-convert-failures.txt
+
+# 일회성 작업 로그
+/scripts/*.log
 
 # DB 백업 (개인정보 포함)
 /backups/

@@ -13,10 +13,28 @@
  *   - 그 외 (타임아웃/에러)                → 그대로 MISSING 유지
  */
 import "dotenv/config";
+import fs from "fs";
 import path from "path";
 import puppeteer, { Browser, Dialog, Page } from "puppeteer";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+
+const SHOP_STATUS_PATH = path.join(process.cwd(), "data", "shop_status.json");
+const DATA_DIR         = path.join(process.cwd(), "data");
+
+async function writeShopStatusJson(prisma: PrismaClient): Promise<number> {
+  const rows = await prisma.shop.findMany({
+    where:  { isScraped: true, externalId: { not: null } },
+    select: { externalId: true, sourceStatus: true },
+  });
+  const map: Record<string, string> = {};
+  for (const r of rows) {
+    if (r.externalId != null) map[String(r.externalId)] = r.sourceStatus;
+  }
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.writeFileSync(SHOP_STATUS_PATH, JSON.stringify(map));
+  return rows.length;
+}
 
 // 스크래퍼의 login 함수 재사용
 // @ts-expect-error scraper.js는 JS module
@@ -115,47 +133,57 @@ async function main() {
     });
     await scraperLogin(page);
 
-    let deleted = 0, alive = 0, errors = 0, restrictedAfterRelogin = 0;
-    let totalReloginCount = 0;
-    let reattemptedItemId: number | null = null;  // 이번에 재로그인 후 재시도하는 아이템
+    // 핵심 휴리스틱:
+    //   - MISSING 글에서 RELOGIN 다이얼로그는 "권한 제한"일 가능성이 압도적 (세션 만료 X)
+    //   - 그래서 기본: RELOGIN → 즉시 DELETED_CONFIRMED 처리
+    //   - 단, 연속 5건+ RELOGIN 이 발생하면 진짜 세션 만료 의심 → 1회만 재로그인 시도
+    //   - 재로그인 후에도 또 연속 RELOGIN 이면 사이트 차단/세션 죽음 → 중단
+    let deleted = 0, alive = 0, errors = 0, restricted = 0;
+    let consecutiveRelogin = 0;
+    let didOneRelogin = false;
     const startedAt = Date.now();
 
     for (let i = 0; i < missing.length; i++) {
       const s = missing[i];
       const r = await visitAndDetect(page, s.externalId!);
-      const tag = r.outcome === "deleted" ? "🗑️  DELETED" : r.outcome === "alive" ? "✅ ALIVE  " : r.outcome === "needs_relogin" ? "🔐 RELOGIN" : "⚠️  ERROR  ";
+      const tag = r.outcome === "deleted" ? "🗑️  DELETED " : r.outcome === "alive" ? "✅ ALIVE   " : r.outcome === "needs_relogin" ? "🔒 RESTRICT" : "⚠️  ERROR   ";
       console.log(`[${i + 1}/${missing.length}] ${tag} wr_id=${s.externalId} | ${s.company} — ${r.reason}`);
 
       if (r.outcome === "needs_relogin") {
-        // 이 아이템에 대해 이미 재로그인 후 재시도한 적이 있다면 → 권한 문제로 간주 (재로그인해도 동일 다이얼로그)
-        if (reattemptedItemId === s.id) {
-          console.log(`   → 재로그인 후에도 동일 다이얼로그 = 접근 권한 없음 → DELETED 처리`);
-          reattemptedItemId = null;
-          restrictedAfterRelogin++;
-          if (!dryRun) {
-            await prisma.shop.update({ where: { id: s.id }, data: { sourceStatus: "DELETED_CONFIRMED" } });
+        consecutiveRelogin++;
+
+        // 연속 5건+ RELOGIN → 진짜 세션 만료 의심
+        if (consecutiveRelogin >= 5 && !didOneRelogin) {
+          console.log(`\n   연속 ${consecutiveRelogin}건 RELOGIN → 세션 만료 의심, 1회 재로그인 시도`);
+          try {
+            const cookies = await page.cookies();
+            if (cookies.length) await page.deleteCookie(...cookies);
+            await scraperLogin(page);
+            didOneRelogin = true;
+            consecutiveRelogin = 0;
+            i--; // 같은 항목 재시도
+            continue;
+          } catch (e: any) {
+            console.log(`재로그인 실패: ${e.message} → 중단`); break;
           }
-          deleted++;
-          await sleep(rand(2000, 4000));
-          continue;
         }
 
-        totalReloginCount++;
-        if (totalReloginCount > 5) { console.log("\n재로그인 5회 초과 → 중단"); break; }
-        try {
-          const cookies = await page.cookies();
-          if (cookies.length) await page.deleteCookie(...cookies);
-          await scraperLogin(page);
-          reattemptedItemId = s.id;
-          i--; // 같은 항목 재시도
-          continue;
-        } catch (e: any) {
-          console.log(`재로그인 실패: ${e.message}`); break;
+        if (consecutiveRelogin >= 5 && didOneRelogin) {
+          console.log(`\n   재로그인 후에도 연속 RELOGIN → 사이트 차단 의심, 중단`); break;
         }
+
+        // 단발성 RELOGIN → 권한 제한으로 간주, DELETED 처리
+        restricted++;
+        if (!dryRun) {
+          await prisma.shop.update({ where: { id: s.id }, data: { sourceStatus: "DELETED_CONFIRMED" } });
+        }
+        deleted++;
+        await sleep(rand(2000, 4000));
+        continue;
       }
 
-      // 정상 outcome 도달 시 재시도 플래그 리셋
-      reattemptedItemId = null;
+      // 정상 응답 도달 → 연속 카운트 리셋
+      consecutiveRelogin = 0;
 
       if (!dryRun) {
         if (r.outcome === "deleted") {
@@ -181,11 +209,17 @@ async function main() {
 
     const dur = ((Date.now() - startedAt) / 1000).toFixed(1);
     console.log("\n=== 결과 ===");
-    console.log(`🗑️  DELETED_CONFIRMED 전환: ${deleted}건 (그 중 재로그인 후 접근불가: ${restrictedAfterRelogin}건)`);
+    console.log(`🗑️  DELETED_CONFIRMED 전환: ${deleted}건 (그 중 권한 제한: ${restricted}건 / 명시적 삭제: ${deleted - restricted}건)`);
     console.log(`✅ ACTIVE 복구:             ${alive}건`);
     console.log(`⚠️  에러/판정 불가:           ${errors}건`);
     console.log(`소요: ${dur}초`);
-    if (dryRun) console.log("\n※ dry-run 모드 — DB 갱신 안 됨");
+
+    if (!dryRun) {
+      const cnt = await writeShopStatusJson(prisma);
+      console.log(`\n📝 shop_status.json 갱신 완료 (${cnt}건)`);
+    } else {
+      console.log("\n※ dry-run 모드 — DB & shop_status.json 갱신 안 됨");
+    }
   } finally {
     await browser.close();
     await prisma.$disconnect();
