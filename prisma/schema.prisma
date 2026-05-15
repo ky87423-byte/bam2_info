@@ -70,6 +70,13 @@ enum RankingPeriodType {
   CUSTOM        // 관리자가 직접 지정한 날짜 ~ 날짜
 }
 
+enum SourceStatus {
+  ACTIVE              // 최근 스크래핑에서 소스 목록에 보임
+  MISSING             // 소스 목록에서 사라짐 (일시적 가능성)
+  DELETED_CONFIRMED   // 상세 페이지 방문 시 "삭제된 글" 확인
+  ARCHIVED            // 30일+ 미관측 → 폐업/이전 추정
+}
+
 enum RankingMode {
   BALANCE       // 보유 포인트 잔액 기준
   PERIOD        // 기간 내 누적(+) 기준
@@ -99,7 +106,10 @@ model Shop {
   isVisible     Boolean  @default(true)
   isScraped     Boolean  @default(true)   // 스크랩 출처 여부 (false = 회원이 직접 등록)
   externalId    Int?     @unique           // 외부 사이트 식별자 (wr_id) — 스마트 upsert 키
-  lastScrapedAt DateTime?                   // 마지막 스크랩 동기화 시각
+  lastScrapedAt    DateTime?                // 마지막 상세 페이지 스크랩 시각
+  lastSeenInListAt DateTime?                // 마지막으로 소스 목록에서 관측된 시각
+  missingStreak    Int           @default(0)      // 연속 미관측 횟수 (목록 수집에서 안 보인 횟수)
+  sourceStatus     SourceStatus  @default(ACTIVE) // 소스 사이트에서의 상태
   virtualUserId Int?     @unique           // 자동 생성된 가상 User 계정 (1:1, lazy)
   ownerId       Int?                        // 클레임 승인 후 실 소유주 (real User)
   createdAt     DateTime @default(now())
@@ -115,6 +125,8 @@ model Shop {
   @@index([isScraped])                     // 스크랩 vs 회원 등록 구분 조회
   @@index([ownerId])                       // 특정 회원 소유 업소 조회
   @@index([lastScrapedAt])                 // sync: 오래된 데이터 우선 갱신
+  @@index([sourceStatus])                  // 상태별 필터링 (어드민/공개 페이지)
+  @@index([lastSeenInListAt])              // 오래된 미관측 항목 일괄 갱신
 }
 
 model AnalyticsEvent {

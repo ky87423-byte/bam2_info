@@ -8,6 +8,11 @@ import { prisma } from "@/lib/prisma";
 import { ensureVirtualUserForShop } from "@/lib/virtualUsers";
 
 const SHOPS_PATH = path.join(process.cwd(), "scraper", "scraped_data", "shops.json");
+const URLS_PATH  = path.join(process.cwd(), "scraper", "scraped_data", "urls.json");
+
+// 미관측 → 상태 전환 임계값
+const ARCHIVE_AFTER_DAYS    = 30;   // 30일 + 3회 이상 미관측 → ARCHIVED
+const ARCHIVE_AFTER_STREAK  = 3;
 
 // shops.json 의 row 구조 (스크래퍼 출력)
 interface ScrapedRow {
@@ -144,6 +149,89 @@ export async function syncShopsFromJsonAction(): Promise<SyncActionResult> {
   };
 }
 
+// ── 가시성 추적 sync (urls.json ↔ DB) ─────────────────────────────────
+// 스크래퍼가 매 실행마다 저장하는 urls.json (현재 소스 목록 스냅샷)을
+// DB의 Shop.externalId 와 대조해 lastSeenInListAt / sourceStatus 갱신.
+export interface VisibilitySyncResult {
+  ok:               true;
+  listedCount:      number;   // urls.json 의 wr_id 수
+  seenUpdated:      number;   // ACTIVE 로 갱신된 Shop 수
+  missingIncreased: number;   // missingStreak +1 된 Shop 수
+  archived:         number;   // ARCHIVED 로 전환된 Shop 수
+  durationMs:       number;
+}
+
+export type VisibilitySyncActionResult =
+  | VisibilitySyncResult
+  | { ok: false; error: string };
+
+export async function syncListVisibilityAction(): Promise<VisibilitySyncActionResult> {
+  const session = await auth();
+  if (session?.user?.role !== "admin") return { ok: false, error: "권한이 없습니다." };
+
+  if (!fs.existsSync(URLS_PATH)) {
+    return { ok: false, error: `urls.json 파일을 찾을 수 없습니다 (${URLS_PATH})` };
+  }
+
+  const t0 = Date.now();
+  const listed: Array<{ wr_id: string }> = JSON.parse(fs.readFileSync(URLS_PATH, "utf-8"));
+
+  // 1) urls.json 의 wr_id 집합 (숫자형으로 정규화)
+  const seenIds = new Set<number>();
+  for (const row of listed) {
+    const id = parseInt(row.wr_id, 10);
+    if (!isNaN(id)) seenIds.add(id);
+  }
+  const seenIdsArr = [...seenIds];
+
+  // 2) 관측됨 → ACTIVE 로 일괄 갱신
+  const seenUpdate = await prisma.shop.updateMany({
+    where: { externalId: { in: seenIdsArr } },
+    data: {
+      lastSeenInListAt: new Date(),
+      sourceStatus:     "ACTIVE",
+      missingStreak:    0,
+    },
+  });
+
+  // 3) DB 에 있는 스크랩 Shop 중 이번 목록에 없는 항목 → missingStreak +1
+  //    (대량일 수 있어 raw SQL 로 원샷; 빈 배열이면 ALL(empty) 가 true 되어 전체 갱신되므로 가드)
+  const missingResult = seenIdsArr.length === 0 ? 0 : await prisma.$executeRaw`
+    UPDATE "Shop"
+    SET "missingStreak" = "missingStreak" + 1,
+        "sourceStatus"  = CASE
+          WHEN "sourceStatus" = 'ACTIVE' THEN 'MISSING'::"SourceStatus"
+          ELSE "sourceStatus"
+        END
+    WHERE "isScraped" = true
+      AND "externalId" IS NOT NULL
+      AND "externalId" <> ALL(${seenIdsArr}::int[])
+  `;
+
+  // 4) 30일+ & 3회+ 미관측 → ARCHIVED 전환
+  const archiveCutoff = new Date(Date.now() - ARCHIVE_AFTER_DAYS * 24 * 3600 * 1000);
+  const archived = await prisma.shop.updateMany({
+    where: {
+      isScraped:        true,
+      sourceStatus:     { in: ["MISSING"] },
+      missingStreak:    { gte: ARCHIVE_AFTER_STREAK },
+      lastSeenInListAt: { lt: archiveCutoff },
+    },
+    data: { sourceStatus: "ARCHIVED" },
+  });
+
+  revalidatePath("/admin/sync");
+
+  return {
+    ok: true,
+    listedCount:      seenIds.size,
+    seenUpdated:      seenUpdate.count,
+    missingIncreased: Number(missingResult),
+    archived:         archived.count,
+    durationMs:       Date.now() - t0,
+  };
+}
+
 // ── 마지막 sync 정보 조회 ─────────────────────────────────────────────
 export async function getSyncStatus(): Promise<{
   totalShops:      number;
@@ -152,8 +240,14 @@ export async function getSyncStatus(): Promise<{
   virtualShops:    number;
   withExternalId:  number;
   lastScrapedAt:   Date | null;
+  lastSeenInListAt: Date | null;
+  bySourceStatus:  Record<"ACTIVE" | "MISSING" | "DELETED_CONFIRMED" | "ARCHIVED", number>;
 }> {
-  const [totalShops, scrapedShops, ownedShops, virtualShops, withExternalId, lastScraped] = await Promise.all([
+  const [
+    totalShops, scrapedShops, ownedShops, virtualShops, withExternalId,
+    lastScraped, lastSeenInList,
+    active, missing, deleted, archived,
+  ] = await Promise.all([
     prisma.shop.count(),
     prisma.shop.count({ where: { isScraped: true } }),
     prisma.shop.count({ where: { ownerId: { not: null } } }),
@@ -164,6 +258,15 @@ export async function getSyncStatus(): Promise<{
       orderBy: { lastScrapedAt: "desc" },
       select: { lastScrapedAt: true },
     }),
+    prisma.shop.findFirst({
+      where:   { lastSeenInListAt: { not: null } },
+      orderBy: { lastSeenInListAt: "desc" },
+      select:  { lastSeenInListAt: true },
+    }),
+    prisma.shop.count({ where: { isScraped: true, sourceStatus: "ACTIVE" } }),
+    prisma.shop.count({ where: { isScraped: true, sourceStatus: "MISSING" } }),
+    prisma.shop.count({ where: { isScraped: true, sourceStatus: "DELETED_CONFIRMED" } }),
+    prisma.shop.count({ where: { isScraped: true, sourceStatus: "ARCHIVED" } }),
   ]);
   return {
     totalShops,
@@ -171,6 +274,13 @@ export async function getSyncStatus(): Promise<{
     ownedShops,
     virtualShops,
     withExternalId,
-    lastScrapedAt: lastScraped?.lastScrapedAt ?? null,
+    lastScrapedAt:    lastScraped?.lastScrapedAt ?? null,
+    lastSeenInListAt: lastSeenInList?.lastSeenInListAt ?? null,
+    bySourceStatus: {
+      ACTIVE:             active,
+      MISSING:             missing,
+      DELETED_CONFIRMED:  deleted,
+      ARCHIVED:            archived,
+    },
   };
 }

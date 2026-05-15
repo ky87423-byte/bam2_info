@@ -393,11 +393,12 @@ async function main() {
         // 1. 로그인
         await login(page);
 
-        // 2. URL 목록 (기존 파일 있으면 재사용)
+        // 2. URL 목록 — 기본: 매번 신선하게 수집 (신규/사라진 글 탐지에 필수)
+        //    CACHED=true 환경변수로만 캐시 재사용 (중단된 run 재개 시)
         let items;
-        if (fs.existsSync(URLS_FILE)) {
+        if (process.env.CACHED === 'true' && fs.existsSync(URLS_FILE)) {
             items = JSON.parse(fs.readFileSync(URLS_FILE,'utf8'));
-            log(`기존 URL 목록 재사용: ${items.length}개`);
+            log(`CACHED=true → 기존 URL 목록 재사용: ${items.length}개`);
         } else {
             items = await collectUrls(page);
         }

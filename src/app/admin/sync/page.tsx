@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { RefreshCw, Database, FileJson, Users, ShieldCheck, Hash } from "lucide-react";
+import { RefreshCw, Database, FileJson, Users, ShieldCheck, Hash, Eye, EyeOff, Trash2, Archive } from "lucide-react";
 import { getSyncStatus } from "@/lib/actions/sync";
 import SyncRunButton from "./SyncRunButton";
+import VisibilitySyncButton from "./VisibilitySyncButton";
 
 export default async function AdminSyncPage() {
   const session = await auth();
@@ -48,15 +49,46 @@ export default async function AdminSyncPage() {
         </div>
       </div>
 
+      {/* 소스 가시성 상태 카드 */}
+      <div className="bg-white rounded-2xl shadow-sm p-5 mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold text-sm text-gray-700">소스 사이트 가시성</h3>
+          {status.lastSeenInListAt && (
+            <span className="text-[11px] text-gray-400">
+              마지막 목록 관측: {new Date(status.lastSeenInListAt).toLocaleString("ko-KR")}
+            </span>
+          )}
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <StatCard icon={Eye}      label="ACTIVE"            value={status.bySourceStatus.ACTIVE.toLocaleString()}            color="bg-green-500" />
+          <StatCard icon={EyeOff}   label="MISSING"           value={status.bySourceStatus.MISSING.toLocaleString()}           color="bg-amber-500" />
+          <StatCard icon={Trash2}   label="DELETED_CONFIRMED" value={status.bySourceStatus.DELETED_CONFIRMED.toLocaleString()} color="bg-red-500"   />
+          <StatCard icon={Archive}  label="ARCHIVED"          value={status.bySourceStatus.ARCHIVED.toLocaleString()}          color="bg-gray-500"  />
+        </div>
+      </div>
+
       {/* 수동 동기화 버튼 */}
-      <div className="bg-white rounded-2xl shadow-sm p-6">
-        <h3 className="font-semibold text-sm text-gray-700 mb-2">수동 전체 동기화</h3>
+      <div className="bg-white rounded-2xl shadow-sm p-6 mb-4">
+        <h3 className="font-semibold text-sm text-gray-700 mb-2">수동 전체 동기화 (shops.json → DB)</h3>
         <p className="text-xs text-gray-500 mb-4 leading-relaxed">
           shops.json 의 모든 row 를 읽어 externalId 기준 upsert. 4,000건 기준 약 30~60초 소요.
           <br />
           진행 중에는 페이지를 닫지 마세요. 완료 후 통계가 자동 갱신됩니다.
         </p>
         <SyncRunButton />
+      </div>
+
+      {/* 가시성 동기화 버튼 */}
+      <div className="bg-white rounded-2xl shadow-sm p-6">
+        <h3 className="font-semibold text-sm text-gray-700 mb-2">가시성 동기화 (urls.json ↔ DB)</h3>
+        <p className="text-xs text-gray-500 mb-4 leading-relaxed">
+          스크래퍼가 수집한 현재 소스 목록(urls.json)과 DB를 대조해 각 업소의 노출 상태를 갱신합니다.
+          <br />
+          · 목록에 보임 → <b>ACTIVE</b> (missingStreak 리셋)
+          <br />
+          · 목록에서 사라짐 → <b>MISSING</b> (streak +1), 3회+ & 30일+ → <b>ARCHIVED</b>
+        </p>
+        <VisibilitySyncButton />
       </div>
 
       {/* 자동 스케줄러 안내 */}
