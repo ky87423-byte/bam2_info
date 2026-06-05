@@ -39,6 +39,9 @@ opga(오피가이드 계열) 소스 사이트를 스크랩해 만든 **한국어
 - 회원/포인트/랭킹·보상/쿠폰/클레임/인콰이어리/쪽지/게시판/카테고리/설정 관리
 - 배지: 미확인 쪽지·신규 인콰이어리·대기 클레임·승인대기 게시글 카운트
 
+### 목록 정렬 (2026-06-05 신규)
+- **유료광고 상단 고정 + 일반 업소 무작위**: `Shop` override에 `isAd` 플래그. 메인 `/`는 새로고침마다 무작위(seed 생성), 페이지 이동 시 Pagination이 seed를 URL로 보존해 정합성 유지. 어드민 업소 편집에 "유료광고" 체크박스. 공개 목록은 DB 아닌 JSON+override 기반이라 마이그레이션 불필요. `src/lib/data.ts` getShops(seed)
+
 ### 데이터 인프라
 - **스크래퍼**(`scraper/scraper.js`): Puppeteer 기반, 로그인→목록→상세 스크랩, 이미지 다운로드 직후 WebP 변환
 - **가상 유저 시스템**: 스크랩 업소마다 lazy 1:1 가상계정(로그인 불가)
@@ -98,6 +101,10 @@ auth(6) · coupon(11) · message(7) · review(6) · boardPost(5) · shop-post(5)
 
 ### 마이그레이션 (14개, 최신 = `20260515123217_add_source_status_tracking`)
 init → message → virtual_user/isScraped → inquiry/claim/owner → shop_community → external_id → main_layout → filter_layout → biztype → message_admin_ack → ranking_excluded → ranking_rewards → ranking_custom_period → source_status_tracking
+
+### 관리자 계정 (2026-06-05 비번 리셋)
+- admin 로그인: `https://bt-001.com/login` → **username `admin` / password `bam2admin!2026`** (로컬·서버 양쪽 동일, bcrypt). 프로덕션엔 dev 퀵로그인 버튼 없음(개발모드 전용). **사용자가 변경 권고됨**
+- `_dev_admin`/`_dev_shop` 등은 passwordHash="" 라 비번 로그인 불가 (개발 dev-bypass 전용)
 
 ### 접속 정보
 - 로컬: `postgres/1234 @ localhost:5432/bam2_info`

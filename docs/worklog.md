@@ -44,6 +44,18 @@
 - **일상 스크래핑 = `scrape-and-deploy.ps1` 한 방, git push 불필요**
 - **git push = 코드(scraper.js 등) 고쳤을 때만**
 
+### sync API 인증 버그 수정 + 파이프라인 실전 검증
+- `/api/admin/sync*` 라우트는 X-Sync-Key 통과시키나 액션 내부가 admin 세션만 체크 → cron/스크립트 호출 차단되던 버그. 액션 인가를 "admin 세션 OR X-Sync-Key 헤더"로 수정(`isAuthorizedForSync`). 커밋 `0b477c0`
+- `scrape-and-deploy.ps1` UTF-8 BOM 추가(PS5.1 한글 파싱), 실전 검증 완료(scp+sync 양쪽 ok:true). 커밋 `a774e87`
+
+### 목록 정렬: 유료광고 + 무작위 (사용자 요청)
+- 문제: `data.ts`가 hit 내림차순 고정 정렬, 유료광고 개념 없음
+- 구현: override에 `isAd` 추가, `getShops(seed)` — 광고 상단 고정 + 나머지 seed 무작위, 메인 새로고침마다 새 seed, Pagination이 seed 보존. 어드민 편집에 광고 체크박스. 커밋 `52387c4`
+- 서버 배포+검증 완료: 새로고침마다 순서 변경 / 같은 seed=같은 순서 확인
+
+### 관리자 비번 리셋
+- admin 계정 비번 분실 → bcrypt 해시라 복원 불가 → `bam2admin!2026`으로 리셋(로컬+서버). dev 퀵로그인은 개발모드 전용이라 프로덕션 불가
+
 ---
 
 ## 이전 개발 연혁 (git 히스토리 요약, ~2026-05)
