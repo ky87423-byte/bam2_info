@@ -77,11 +77,18 @@ async function visitAndDetect(page: Page, wrId: number): Promise<VisitResult> {
 
     if (lastDialog) {
       const msg = lastDialog as string;
-      if (RELOGIN_PATTERNS.some((p) => p.test(msg))) {
-        return { outcome: "needs_relogin", reason: `dialog: ${msg.substring(0, 60)}` };
-      }
       if (DELETE_PATTERNS.some((p) => p.test(msg))) {
         return { outcome: "deleted", reason: `dialog: ${msg.substring(0, 60)}` };
+      }
+      if (RELOGIN_PATTERNS.some((p) => p.test(msg))) {
+        // "로그인이 필요" 다이얼로그 — 세션 만료 vs 글 제한 구분.
+        // 페이지에 로그아웃 링크가 남아있으면(=여전히 로그인 상태) 글이 삭제/제한된 것이므로 deleted.
+        // 로그아웃 링크가 없으면(=진짜 로그아웃됨) 재로그인 필요.
+        const stillLoggedIn = await page.evaluate(() => /로그아웃/.test(document.body.innerText || ""));
+        if (stillLoggedIn) {
+          return { outcome: "deleted", reason: `제한됨(로그인 유지 중): ${msg.substring(0, 40)}` };
+        }
+        return { outcome: "needs_relogin", reason: `세션만료 의심: ${msg.substring(0, 40)}` };
       }
       return { outcome: "error", reason: `unknown dialog: ${msg.substring(0, 60)}` };
     }

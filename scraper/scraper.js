@@ -15,11 +15,15 @@ const url_mod = require('url');
 const { toWebP } = require('./lib/webp-convert');
 
 // ── 설정 ──────────────────────────────────────────────────────────
+// 소스 사이트 도메인은 주기적으로 바뀜 (opga037 → opga039 → ...).
+// .env 의 SOURCE_BASE_URL 한 줄만 바꾸면 전체가 따라감.
+const SOURCE_BASE_URL = (process.env.SOURCE_BASE_URL || 'https://opga039.com').replace(/\/+$/, '');
+
 const CFG = {
     id:            'asdf87a',
     pw:            'asdf87a',
-    baseUrl:       'https://opga037.com',
-    listUrl:       'https://opga037.com/bbs/board.php?bo_table=op_partner_posting&cat=0&cat2=0&biz=0',
+    baseUrl:       SOURCE_BASE_URL,
+    listUrl:       `${SOURCE_BASE_URL}/bbs/board.php?bo_table=op_partner_posting&cat=0&cat2=0&biz=0`,
     delayMin:      2000,    // 2~5초 랜덤 딜레이 (차단 방지 + 스크래퍼 효율)
     delayMax:      5000,
     pauseEvery:    100,
@@ -103,7 +107,7 @@ async function downloadImageWithPage(page, imgUrl, destPath, originalExt) {
         const res = await fetch(imgUrl, {
             headers: {
                 'User-Agent': CFG.userAgent,
-                'Referer':    'https://opga037.com/',
+                'Referer':    `${CFG.baseUrl}/`,
                 'Cookie':     cookieHeader,
             },
         });
@@ -119,7 +123,7 @@ async function downloadImageWithPage(page, imgUrl, destPath, originalExt) {
 // ── 로그인 (단일 시도) ─────────────────────────────────────────────
 async function loginOnce(page) {
     log('로그인 시도...');
-    await page.goto('https://opga037.com/bbs/login.php', { waitUntil: 'networkidle2', timeout: 30000 });
+    await page.goto(`${CFG.baseUrl}/bbs/login.php`, { waitUntil: 'networkidle2', timeout: 30000 });
     // networkidle2만으로는 폼 렌더가 보장되지 않을 수 있음 → 셀렉터 대기 필수
     await page.waitForSelector('#login_id', { timeout: 15000 });
     await sleep(800);
@@ -254,8 +258,8 @@ async function scrapeDetail(page, item, idx) {
                     if (!src) return false;
                     // 명백한 사이트 자산 경로 제외
                     if (/\/(skin|thema|theme|sns|banner|button|footer|header|nav|emoticon|emo|level\/icon|mobile_logo|sprite)\//i.test(src)) return false;
-                    // opga037 자체 /img/ 경로 = 보통 사이트 자산
-                    if (/opga037\.[^/]+\/img\//i.test(src)) return false;
+                    // 소스 사이트 자체 /img/ 경로 = 보통 사이트 자산 (opga037/039/… 도메인 무관)
+                    if (/opga\d*\.[^/]+\/img\//i.test(src)) return false;
                     // 회원 프로필 사진 (작은 thumbnail 다수)
                     if (/\/data\/apms\/photo\//i.test(src)) return false;
                     // base64 / blob
