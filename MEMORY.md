@@ -1,6 +1,6 @@
 # MEMORY — bam2_info 프로젝트 상태 메모리
 
-> 최종 갱신: **2026-06-05**. 코드/git에서 안 드러나는 **현재 상태·결정·함정**을 기록.
+> 최종 갱신: **2026-06-06**. 코드/git에서 안 드러나는 **현재 상태·결정·함정**을 기록.
 > 작업 규칙 → [CLAUDE.md](CLAUDE.md) · 작업 연혁 → [docs/worklog.md](docs/worklog.md)
 
 ---
@@ -138,39 +138,47 @@ init → message → virtual_user/isScraped → inquiry/claim/owner → shop_com
 | HTTPS | Let's Encrypt 발급 완료(이메일 없이), HTTP→HTTPS 301, 자동갱신 |
 | SSH | 키 전용(`~/.ssh/bam2_deploy`, passphrase 없음), 비밀번호 로그인 차단 |
 | 이미지 | 48,892개 WebP / 50.85GB, 로컬=서버 일치(rclone check 0 diff), nginx 직접 서빙 |
-| 코드 동기화 | git `c7b1c89`까지 push 완료. 서버는 git archive로 배포 |
-| 🟡 가시성 엔드포인트 | `/api/admin/sync/visibility` 서버 재빌드 중(2026-06-05) — **배포 검증 미완** |
+| 코드 동기화 | git `a149f69`까지 push 완료. 서버는 변경 파일 scp + 재빌드로 배포 |
+| sync 엔드포인트 | `/api/admin/sync`, `/api/admin/sync/visibility` 둘 다 ✅ 검증(ok:true) |
+| 광고 정렬 기능 | ✅ 라이브 적용·검증 (새로고침 무작위 / 같은 seed=같은 순서) |
+
+### 재해 복구 백업 (2026-06-06 시점, 전부 로컬 보유)
+- **코드**: GitHub `origin/master` = `a149f69`
+- **이미지**: 로컬 `public/images/imgs/` 48,892개 (서버와 동일)
+- **서버 최신 DB**: `backups/server_bam2_20260606_014724.dump` (라이브 상태 그대로, 검증됨)
+- **서버 런타임/시크릿**: `backups/server_runtime_20260606_014724/` (data/ + .env)
+- → 서버 삭제돼도 데이터 손실 0. 재구축은 `deploy/DEPLOY.md` 따라 (이미지 재업로드 3-4h가 유일한 비용). 새 서버는 IP 바뀌므로 Njalla DNS + SSH 키 갱신 필요
 
 ### 배포 도구 (`deploy/`)
 - `setup-server.sh` — 서버 초기 세팅(멱등)
 - `nginx-bam2.conf` — nginx 설정(`/images/` 직접 서빙)
 - `DEPLOY.md` — 단계별 배포 가이드
-- `scrape-and-deploy.ps1` — **일상 운영 원커맨드**(스크랩→이미지→데이터→서버sync)
+- `scrape-and-deploy.ps1` — **일상 운영 원커맨드**(스크랩→이미지→데이터→서버sync). PowerShell 5.1용 UTF-8 BOM 필수
 
 ---
 
 ## 6. 해결 안된 문제
 
-1. **🔴 SNI 차단 (가장 중요)**: `bt-001.com`이 한국 통신사 SNI 검사로 차단됨(warning.or.kr "불법·유해"). DNS·IP는 깨끗. 보안DNS(DoH)/VPN 사용자만 접속 가능. 일반 통신사 사용자는 차단됨.
+1. **🔴 SNI 차단 (가장 중요·미해결)**: `bt-001.com`이 한국 통신사 SNI 검사로 차단됨(warning.or.kr "불법·유해"). DNS·IP는 깨끗. 보안DNS(DoH)/VPN 사용자만 접속 가능. 일반 통신사 사용자는 차단됨.
    - 원인: 도메인 이름 기반 차단. opga가 037→039로 도메인 바꾸는 것과 동일 이유.
    - **대응 방향(보류)**: 도메인 로테이션 운영 체계 + 보안DNS 설정 안내 페이지
-2. **🟡 가시성 sync 엔드포인트 배포 미검증**: `/api/admin/sync/visibility` 서버 재빌드 후 실제 호출 테스트 필요
-3. **🟡 scrape-and-deploy.ps1 실전 미검증**: 엔드투엔드 1회 실행 확인 필요
-4. **opga039 Cloudflare**: 일반 curl은 403. Puppeteer는 통과하므로 스크래퍼는 OK지만 curl 기반 진단/모니터링 불가
-5. **R2/외부 스토리지 미사용**: 코드는 있으나 익명성 위해 비활성 (현재 파일시스템 직접 서빙)
+2. **🟡 서버 결제 (2026-06-06 마감)**: Shinjiru 입금 안 하면 서버 삭제 위험. 데이터는 전부 백업됨(§5)이라 손실은 없으나, 내려가면 재구축+이미지 재업로드(3-4h) 필요. 유지가 시간상 이득.
+3. **opga039 Cloudflare**: 일반 curl은 403. Puppeteer는 통과하므로 스크래퍼는 OK지만 curl 기반 진단/모니터링 불가
+4. **R2/외부 스토리지 미사용**: 코드는 있으나 익명성 위해 비활성 (현재 파일시스템 직접 서빙)
+
+> ✅ 해결됨(이전 미해결 항목): 가시성 sync 엔드포인트 배포·검증, scrape-and-deploy.ps1 실전 검증 — 둘 다 2026-06-05 완료.
 
 ---
 
 ## 7. 다음 작업 순서
 
-1. **[즉시] 서버 빌드 완료 확인** → `/api/admin/sync/visibility` 호출 테스트(SSH localhost + X-Sync-Key)
-2. **[즉시] `scrape-and-deploy.ps1` 실전 1회 검증** (가급 `-SkipScrape -SkipImages`로 sync만 먼저)
-3. **[단기] 문서 3종 커밋** (CLAUDE.md / MEMORY.md / docs/worklog.md)
-4. **[중기] SNI 차단 대응 결정**:
+1. **[최우선] 서버 결제 결정** — 유지할지/내릴지. 내리면 데이터는 안전하나 재구축 비용(이미지 3-4h)
+2. **[권장] admin 비번 변경** — `bam2admin!2026`이 대화에 노출됨. 로그인 후 교체
+3. **[중기] SNI 차단 대응 결정**:
    - 보안DNS 안내 페이지 제작
    - 도메인 로테이션 운영 체계(차단 감지 → 새 도메인 발급 → DNS 전환 → 안내)
-5. **[중기] 일일 자동 스크래핑**: Windows 작업 스케줄러에 `scrape-and-deploy.ps1` 등록(PC 상시 가동 전제)
-6. **[운영] 정기 점검**: 소스 도메인 변경 모니터링(opga039→다음), DB 백업 주기화, certbot 갱신 확인
+4. **[중기] 일일 자동 스크래핑**: Windows 작업 스케줄러에 `scrape-and-deploy.ps1` 등록(PC 상시 가동 전제)
+5. **[운영] 정기 점검**: 소스 도메인 변경 모니터링(opga039→다음), DB 백업 주기화, certbot 갱신 확인
 
 ---
 
