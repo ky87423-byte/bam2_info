@@ -3,9 +3,24 @@
 import fs from "fs";
 import path from "path";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { ensureVirtualUserForShop } from "@/lib/virtualUsers";
+
+// sync 액션 인가: admin 세션 OR 유효한 X-Sync-Key 헤더 (cron/서버 호출용).
+// 헤더는 같은 요청 컨텍스트에서 읽히므로, /api/admin/sync* 라우트가 액션을 호출할 때
+// 클라이언트가 보낸 X-Sync-Key 가 그대로 전달됨. 키가 없으면 외부에서 우회 불가.
+async function isAuthorizedForSync(): Promise<boolean> {
+  const session = await auth();
+  if (session?.user?.role === "admin") return true;
+  const envKey = process.env.SYNC_API_KEY;
+  if (envKey) {
+    const headerKey = (await headers()).get("x-sync-key");
+    if (headerKey && headerKey === envKey) return true;
+  }
+  return false;
+}
 
 const SHOPS_PATH       = path.join(process.cwd(), "scraper", "scraped_data", "shops.json");
 const URLS_PATH        = path.join(process.cwd(), "scraper", "scraped_data", "urls.json");
@@ -73,8 +88,7 @@ export type SyncActionResult =
 
 // ── 메인 sync 액션 (admin 전용) ────────────────────────────────────────
 export async function syncShopsFromJsonAction(): Promise<SyncActionResult> {
-  const session = await auth();
-  if (session?.user?.role !== "admin") return { ok: false, error: "권한이 없습니다." };
+  if (!(await isAuthorizedForSync())) return { ok: false, error: "권한이 없습니다." };
 
   if (!fs.existsSync(SHOPS_PATH)) {
     return { ok: false, error: `shops.json 파일을 찾을 수 없습니다 (${SHOPS_PATH})` };
@@ -186,8 +200,7 @@ export type VisibilitySyncActionResult =
   | { ok: false; error: string };
 
 export async function syncListVisibilityAction(): Promise<VisibilitySyncActionResult> {
-  const session = await auth();
-  if (session?.user?.role !== "admin") return { ok: false, error: "권한이 없습니다." };
+  if (!(await isAuthorizedForSync())) return { ok: false, error: "권한이 없습니다." };
 
   if (!fs.existsSync(URLS_PATH)) {
     return { ok: false, error: `urls.json 파일을 찾을 수 없습니다 (${URLS_PATH})` };
