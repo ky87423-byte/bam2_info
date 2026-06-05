@@ -1,0 +1,43 @@
+# 빌드 산출물 (서버에서 npm ci && next build 로 재생성)
+node_modules/
+.next/
+tsconfig.tsbuildinfo
+next-env.d.ts
+
+# 격리 폴더 (이미 처리된 쓰레기/실패 파일)
+_quarantine_html_trash/
+_quarantine_failed_convert/
+_quarantine_bak/
+
+# Git 메타 (필요시 따로 결정)
+.git/
+
+# 로그 (서버에서 새로 생성)
+*.log
+dev.log
+scraper/scraped_data/*.log
+scripts/*.log
+
+# 환경/시크릿 (서버에 별도 작성)
+.env
+.env.local
+.env.*.local
+
+# OS / 에디터 메타
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+
+# Claude 메타
+.claude/
+
+# 임시 백업
+*.bak
+*.bak.*
+backups/
+
+# IDE/TS 캐시
+*.tsbuildinfo

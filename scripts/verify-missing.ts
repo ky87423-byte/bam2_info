@@ -37,7 +37,7 @@ async function writeShopStatusJson(prisma: PrismaClient): Promise<number> {
 }
 
 // 스크래퍼의 login 함수 재사용
-// @ts-expect-error scraper.js는 JS module
+// @ts-ignore -- scraper.js는 JS module (환경에 따라 타입 해석이 달라 expect-error 대신 ignore 사용)
 import { login as scraperLogin, CFG } from "../scraper/scraper.js";
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
