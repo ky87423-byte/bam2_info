@@ -55,9 +55,9 @@ npm test                            # vitest (events/stats 테스트 3개)
 npx prisma migrate dev              # 마이그레이션   npx prisma generate
 
 # 스크래핑 → 서버 반영 (일상 루틴, git 무관)
-pwsh deploy\scrape-and-deploy.ps1                 # 전체
-pwsh deploy\scrape-and-deploy.ps1 -SkipImages     # 데이터만
-pwsh deploy\scrape-and-deploy.ps1 -SkipScrape     # 이미 받은 것 반영만
+powershell -File deploy\scrape-and-deploy.ps1                 # 전체
+powershell -File deploy\scrape-and-deploy.ps1 -SkipImages     # 데이터만
+powershell -File deploy\scrape-and-deploy.ps1 -SkipScrape     # 이미 받은 것 반영만
 
 # MISSING 검증 (소스에서 삭제됐는지 확인)
 npx tsx scripts/verify-missing.ts --dry-run       # 비파괴 미리보기

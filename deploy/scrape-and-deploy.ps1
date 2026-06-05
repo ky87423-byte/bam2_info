@@ -1,4 +1,4 @@
-<#
+﻿<#
   scrape-and-deploy.ps1 — 스크래핑 → 서버 반영을 한 방에.
 
   실행:  pwsh deploy\scrape-and-deploy.ps1
