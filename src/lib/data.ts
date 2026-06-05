@@ -45,6 +45,7 @@ export interface ShopData {
   time2: string;
   timeFull: boolean;
   isVisible: boolean;
+  isAd: boolean;          // 유료광고 — 목록 상단 고정 (override 로 admin 이 지정)
   createdAt: Date;
   updatedAt: Date;
 }
@@ -385,6 +386,7 @@ function loadShops(): ShopData[] {
         time2:     ov.time2     ?? s.time2 ?? "",
         timeFull:  ov.timeFull  ?? s.timeFull === 1,
         isVisible: ov.isVisible ?? true,
+        isAd:      ov.isAd      ?? false,
         createdAt: new Date(s.scrapedAt),
         updatedAt: new Date(),
       } as ShopData;
@@ -481,13 +483,43 @@ export function getRegionGroups(): RegionGroup[] {
     .sort((a, b) => b.count - a.count);
 }
 
+// 문자열 seed → 32bit 정수 (FNV-1a)
+function seedToInt(seed: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+// mulberry32 시드 PRNG — 같은 seed = 같은 순서 (페이지네이션 정합성)
+function mulberry32(a: number): () => number {
+  return function () {
+    a |= 0; a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+// seed 기반 Fisher-Yates 셔플 (원본 불변)
+function seededShuffle<T>(arr: T[], seed: string): T[] {
+  const rnd = mulberry32(seedToInt(seed));
+  const out = arr.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
 export function getShops(
   area: string,
   q: string,
   page: number,
   pageSize = PAGE_SIZE,
   bizType = "",
-  region = ""           // 광역 cat 코드 (그룹 필터, area 미선택 시에만 의미)
+  region = "",          // 광역 cat 코드 (그룹 필터, area 미선택 시에만 의미)
+  seed?: string         // 지정 시: 유료광고 상단 고정 + 나머지 seed 무작위 (새로고침마다 순서 변경)
 ) {
   let shops = loadShops();
   if (area)    shops = shops.filter((s) => s.area.includes(area));
@@ -501,7 +533,15 @@ export function getShops(
       s.area.toLowerCase().includes(lq)
     );
   }
-  shops = shops.sort((a, b) => b.hit - a.hit);
+  if (seed !== undefined) {
+    // 유료광고: 상단 고정 (광고끼리는 조회수 순). 나머지: seed 무작위.
+    const ads    = shops.filter((s) => s.isAd).sort((a, b) => b.hit - a.hit);
+    const normal = seededShuffle(shops.filter((s) => !s.isAd), seed);
+    shops = [...ads, ...normal];
+  } else {
+    // seed 없음(어드민 등): 기존 조회수 내림차순 고정
+    shops = shops.sort((a, b) => b.hit - a.hit);
+  }
   const total = shops.length;
   return { shops: shops.slice((page - 1) * pageSize, page * pageSize), total };
 }
@@ -526,6 +566,12 @@ export function toggleShopVisibility(id: number) {
   const shop = getShopById(id);
   if (!shop) return;
   updateShop(id, { isVisible: !shop.isVisible });
+}
+
+export function toggleShopAd(id: number) {
+  const shop = getShopById(id);
+  if (!shop) return;
+  updateShop(id, { isAd: !shop.isAd });
 }
 
 // ── 회원 CRUD (Prisma) ───────────────────────────────────────────────────────

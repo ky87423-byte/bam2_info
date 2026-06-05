@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { updateShop, deleteShop, toggleShopVisibility } from "@/lib/data";
+import { updateShop, deleteShop, toggleShopVisibility, toggleShopAd } from "@/lib/data";
 import { isAdminSession } from "./_authGuards";
 
 export async function actionUpdateShop(formData: FormData) {
@@ -23,6 +23,7 @@ export async function actionUpdateShop(formData: FormData) {
     time2: formData.get("time2") as string,
     timeFull: formData.get("timeFull") === "on",
     isVisible: formData.get("isVisible") === "on",
+    isAd: formData.get("isAd") === "on",
   });
 
   revalidatePath("/admin/shops");
@@ -38,6 +39,13 @@ export async function actionDeleteShop(id: number) {
 export async function actionToggleShopVisibility(id: number) {
   if (!(await isAdminSession())) return;
   toggleShopVisibility(id);
+  revalidatePath("/admin/shops");
+  revalidatePath(`/admin/shops/${id}`);
+}
+
+export async function actionToggleShopAd(id: number) {
+  if (!(await isAdminSession())) return;
+  toggleShopAd(id);
   revalidatePath("/admin/shops");
   revalidatePath(`/admin/shops/${id}`);
 }

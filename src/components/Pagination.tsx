@@ -6,9 +6,10 @@ interface Props {
   total: number;
   page: number;
   pageSize: number;
+  seed?: string;     // 무작위 정렬 seed — 페이지 이동 시 순서 유지를 위해 URL 에 보존
 }
 
-export default function Pagination({ total, page, pageSize }: Props) {
+export default function Pagination({ total, page, pageSize, seed }: Props) {
   const router = useRouter();
   const params = useSearchParams();
   const totalPages = Math.ceil(total / pageSize);
@@ -18,6 +19,7 @@ export default function Pagination({ total, page, pageSize }: Props) {
   function go(p: number) {
     const np = new URLSearchParams(params.toString());
     np.set("page", String(p));
+    if (seed) np.set("seed", seed);
     router.push(`/?${np.toString()}`);
   }
 

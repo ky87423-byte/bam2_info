@@ -52,6 +52,18 @@ export default function ShopEditForm({ shop }: { shop: ShopData }) {
               <span className="text-sm text-gray-700">노출</span>
             </label>
           </div>
+          <div>
+            <label className="text-xs text-gray-500 block mb-2">유료광고</label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                name="isAd"
+                defaultChecked={shop.isAd}
+                className="w-4 h-4 accent-yellow-500"
+              />
+              <span className="text-sm text-gray-700">광고 (목록 상단 고정)</span>
+            </label>
+          </div>
         </div>
         <div className="mt-4 grid grid-cols-3 gap-4">
           <Field label="영업 시작" name="time1" defaultValue={shop.time1} placeholder="09:00" />

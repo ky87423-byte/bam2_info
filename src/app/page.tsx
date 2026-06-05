@@ -19,7 +19,7 @@ const FILTER_COMPONENTS = {
 const PAGE_SIZE = 20;
 
 interface Props {
-  searchParams: Promise<{ region?: string; area?: string; bizType?: string; q?: string; page?: string }>;
+  searchParams: Promise<{ region?: string; area?: string; bizType?: string; q?: string; page?: string; seed?: string }>;
 }
 
 export default async function HomePage({ searchParams }: Props) {
@@ -29,11 +29,13 @@ export default async function HomePage({ searchParams }: Props) {
   const bizType = params.bizType ?? "";
   const q       = params.q       ?? "";
   const page    = Math.max(1, parseInt(params.page ?? "1", 10));
+  // seed: 없으면 새로 생성(새로고침마다 새 무작위 순서). 페이지 이동 시 Pagination 이 URL 로 유지.
+  const seed    = params.seed ?? Math.random().toString(36).slice(2, 10);
 
   const [regionGroups, bizTypes, shopsResult, config] = await Promise.all([
     Promise.resolve(getRegionGroups()),
     Promise.resolve(getBizTypes()),
-    Promise.resolve(getShops(area, q, page, PAGE_SIZE, bizType, region)),
+    Promise.resolve(getShops(area, q, page, PAGE_SIZE, bizType, region, seed)),
     getSiteConfig(),
   ]);
   const { shops, total } = shopsResult;
@@ -72,7 +74,7 @@ export default async function HomePage({ searchParams }: Props) {
   );
   const pagination = (
     <Suspense fallback={null}>
-      <Pagination total={total} page={page} pageSize={PAGE_SIZE} />
+      <Pagination total={total} page={page} pageSize={PAGE_SIZE} seed={seed} />
     </Suspense>
   );
 
